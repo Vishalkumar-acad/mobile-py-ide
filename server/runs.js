@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import config from './config.js';
+import { PTY_DRIVER } from './pty.js';
 
 const runs = new Map();
 const LOG_CAP = 800;
@@ -47,13 +48,18 @@ export async function killRunsForSpace(spaceId) {
 }
 
 // kind: 'python' runs the given code file; 'bash' starts a shell reading
-// commands from stdin (the terminal mode).
-function buildCommand({ filePath, kind, memoryMb, maxMs }) {
+// commands from stdin; 'pty' gives a real pseudoterminal (Terminal and REPL).
+function buildCommand({ filePath, kind, memoryMb, maxMs, ptyCmd }) {
   const memKb = Math.max(16, Math.round(memoryMb)) * 1024;
   const cpuSec = Math.max(2, Math.ceil(maxMs / 1000) + 2);
   const fileBlocks = Math.max(64, Math.round(config.maxFileMb)) * 2048; // 512-byte blocks
   const limits = `ulimit -v ${memKb} 2>/dev/null; ulimit -t ${cpuSec} 2>/dev/null; ulimit -f ${fileBlocks} 2>/dev/null;`;
 
+  if (kind === 'pty') {
+    // $1 is the relay script; ptyCmd is the program it runs under the pty.
+    const inner = String(ptyCmd || 'bash -i');
+    return `${limits} exec ${JSON.stringify(config.pythonBin)} -u "$1" ${inner}`;
+  }
   if (kind === 'bash') {
     return `${limits} exec bash --noprofile --norc -s`;
   }
@@ -71,10 +77,12 @@ function buildCommand({ filePath, kind, memoryMb, maxMs }) {
 export async function createRun(code, opts = {}) {
   const idleMs = opts.idleMs ?? config.runIdleMs;
   const maxMs = opts.maxMs ?? config.runMaxMs;
-  const kind = opts.kind === 'bash' ? 'bash' : 'python';
+  const kind = opts.kind === 'bash' ? 'bash' : (opts.kind === 'pty' ? 'pty' : 'python');
   const memoryMb = opts.memoryMb ?? config.memoryLimitMb;
   const workDir = opts.cwd || config.workspaceDir;
   const spaceId = opts.spaceId || null;
+  const ptyCmd = opts.ptyCmd || 'bash -i';
+  const raw = kind === 'pty';
 
   const id = crypto.randomBytes(9).toString('hex');
   // The caller's space is the working directory, so files written with a
@@ -86,6 +94,9 @@ export async function createRun(code, opts = {}) {
   if (kind === 'python') {
     file = path.join(dir, `exec_${crypto.randomBytes(6).toString('hex')}.py`);
     await writeFile(file, code, 'utf8');
+  } else if (kind === 'pty') {
+    file = path.join(dir, `pty_${crypto.randomBytes(6).toString('hex')}.py`);
+    await writeFile(file, PTY_DRIVER, 'utf8');
   }
 
   const listeners = new Set();
@@ -193,20 +204,26 @@ export async function createRun(code, opts = {}) {
     const remaining = config.maxOutputBytes - run.outputBytes;
     if (remaining <= 0) { run.truncated = true; stop('output_limit'); return; }
 
-    let text;
-    if (buf.length >= remaining) {
-      text = buf.subarray(0, remaining).toString('utf8');
+    let piece = buf;
+    if (piece.length >= remaining) {
+      piece = piece.subarray(0, remaining);
       run.outputBytes = config.maxOutputBytes;
       run.truncated = true;
     } else {
-      text = buf.toString('utf8');
-      run.outputBytes += buf.length;
+      run.outputBytes += piece.length;
     }
-    if (stream === 'stdout') run.stdout += text; else run.stderr += text;
-    emit({ type: 'output', stream, text });
+
+    if (raw) {
+      // A terminal stream is bytes, not text — send it base64 so nothing is lost.
+      emit({ type: 'output', raw: true, b64: piece.toString('base64') });
+    } else {
+      const text = piece.toString('utf8');
+      if (stream === 'stdout') run.stdout += text; else run.stderr += text;
+      emit({ type: 'output', stream, text });
+    }
 
     if (run.truncated) {
-      emit({ type: 'output', stream: 'stderr', text: '\n… output limit reached, stopping.\n' });
+      if (!raw) emit({ type: 'output', stream: 'stderr', text: '\n… output limit reached, stopping.\n' });
       stop('output_limit');
       return;
     }
@@ -224,6 +241,12 @@ export async function createRun(code, opts = {}) {
     TERM: 'dumb',
     PS1: '',
   };
+  if (raw) {
+    env.TERM = 'xterm-256color';
+    env.PTY_COLS = String(Math.max(20, Math.min(500, opts.cols || 100)));
+    env.PTY_ROWS = String(Math.max(5, Math.min(200, opts.rows || 30)));
+    env.PS1 = '$ ';
+  }
 
   const argv = kind === 'bash'
     ? ['-c', buildCommand({ kind, memoryMb, maxMs })]
@@ -256,6 +279,17 @@ export async function createRun(code, opts = {}) {
   child.on('close', (exitCode) => { run.exitCode = exitCode; finalize(); });
 
   run.write = (data) => {
+    if (run.finished || !run.child) return false;
+    try {
+      run.child.stdin.write(data);
+      touchIdle();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  run.writeRaw = (data) => {
     if (run.finished || !run.child) return false;
     try {
       run.child.stdin.write(data);

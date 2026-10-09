@@ -25,6 +25,7 @@ import { allowlist, installPackage } from './packages.js';
 import { listFiles, readFile, writeFile, deleteFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
 import { diagnostics } from './diag.js';
 import { identify, touch, startSweeper, perUserLimitBytes } from './spaces.js';
+import { acceptWebSocket } from './ws.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -191,31 +192,32 @@ function sseOpen(res) {
   res.write(': connected\n\n');
 }
 
-// Work out what to run for a given mode.
+// Work out what to run for a given mode. With `pty: true` the Terminal and
+// REPL run under a real pseudoterminal, which is what the desktop terminal
+// uses; without it they keep the simpler line-based behaviour.
 function resolveMode(payload) {
   const mode = ['script', 'repl', 'terminal'].includes(payload.mode) ? payload.mode : 'script';
+  const wantPty = payload.pty === true;
+
   if (mode === 'terminal') {
     if (!config.allowTerminal) return { error: 'Terminal mode is turned off on this server.' };
-    return {
-      mode,
-      code: '',
-      opts: { kind: 'bash', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb },
-      skipValidation: true,
-    };
+    const opts = wantPty
+      ? { kind: 'pty', ptyCmd: 'bash --norc -i', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb }
+      : { kind: 'bash', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb };
+    return { mode, code: '', opts, skipValidation: true, pty: wantPty };
   }
   if (mode === 'repl') {
-    return {
-      mode,
-      code: REPL_SOURCE,
-      opts: { kind: 'python', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.memoryLimitMb },
-      skipValidation: true,
-    };
+    const opts = wantPty
+      ? { kind: 'pty', ptyCmd: `${JSON.stringify(config.pythonBin)} -i -q`, idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.memoryLimitMb }
+      : { kind: 'python', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.memoryLimitMb };
+    return { mode, code: wantPty ? '' : REPL_SOURCE, opts, skipValidation: true, pty: wantPty };
   }
   return {
     mode: 'script',
     code: typeof payload.code === 'string' ? payload.code : '',
     opts: { kind: 'python', idleMs: config.runIdleMs, maxMs: config.runMaxMs, memoryMb: config.memoryLimitMb },
     skipValidation: false,
+    pty: false,
   };
 }
 
@@ -343,7 +345,13 @@ const server = http.createServer(async (req, res) => {
 
       let run;
       try {
-        run = await createRun(resolved.code, { ...resolved.opts, cwd: space.dir, spaceId: space.id });
+        run = await createRun(resolved.code, {
+          ...resolved.opts,
+          cwd: space.dir,
+          spaceId: space.id,
+          cols: payload.cols,
+          rows: payload.rows,
+        });
       } catch {
         releaseSlot();
         return json(res, 500, { status: 'error', error: 'Could not start the run.' });
@@ -351,7 +359,7 @@ const server = http.createServer(async (req, res) => {
       run.done.then(() => releaseSlot());
       touch(space.dir);
       if (stdin) run.write(stdin.endsWith('\n') ? stdin : `${stdin}\n`);
-      return json(res, 200, { runId: run.id, mode: resolved.mode });
+      return json(res, 200, { runId: run.id, mode: resolved.mode, pty: !!resolved.pty });
     }
 
     // ---- final result of a run (fallback if the live stream drops) ----
@@ -480,6 +488,65 @@ const server = http.createServer(async (req, res) => {
 
 fs.mkdir(config.workspaceDir, { recursive: true }).catch(() => {});
 startSweeper();
+
+// A run's terminal can also be attached over a WebSocket, which is what the
+// desktop terminal uses: raw bytes both ways, no per-keystroke HTTP.
+server.on('upgrade', (req, socket) => {
+  let pathname = '';
+  try {
+    pathname = new URL(req.url, 'http://localhost').pathname;
+  } catch {
+    socket.destroy();
+    return;
+  }
+  const m = pathname.match(/^\/api\/runs\/([0-9a-f]+)\/ws$/);
+  const run = m ? getRun(m[1]) : null;
+  if (!run) {
+    socket.destroy();
+    return;
+  }
+
+  const conn = acceptWebSocket(req, socket);
+  if (!conn) return;
+
+  const unsub = run.subscribe((evt) => {
+    if (!conn.open) return;
+    if (evt.type === 'output') {
+      if (evt.raw) conn.sendBinary(Buffer.from(evt.b64, 'base64'));
+      else conn.sendText(JSON.stringify({ type: 'text', stream: evt.stream, text: evt.text }));
+    } else if (evt.type === 'exit') {
+      conn.sendText(JSON.stringify({
+        type: 'exit',
+        status: evt.status,
+        exit_code: evt.exit_code,
+        elapsed_ms: evt.elapsed_ms,
+      }));
+      conn.close();
+    }
+  });
+
+  conn.onMessage((payload, isBinary) => {
+    if (isBinary) {
+      run.writeRaw(payload);
+      return;
+    }
+    let msg;
+    try {
+      msg = JSON.parse(payload.toString('utf8'));
+    } catch {
+      return;
+    }
+    if (msg.type === 'input' && typeof msg.b64 === 'string') {
+      run.writeRaw(Buffer.from(msg.b64, 'base64'));
+    } else if (msg.type === 'input' && typeof msg.text === 'string') {
+      run.writeRaw(Buffer.from(msg.text, 'utf8'));
+    } else if (msg.type === 'kill') {
+      run.kill();
+    }
+  });
+
+  conn.onClose(() => { unsub(); });
+});
 
 server.listen(config.port, config.host, () => {
   // eslint-disable-next-line no-console

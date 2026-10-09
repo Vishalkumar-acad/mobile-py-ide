@@ -12,6 +12,7 @@
   <title>PyPad</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%8D%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -47,6 +48,7 @@
         <button type="button" class="mode" data-mode="terminal" hidden>Terminal</button>
       </div>
       <div id="output" class="console-output"><span class="muted">Press ▶ Run to execute your code.</span></div>
+      <div id="termMount" class="term-mount" hidden></div>
 
       <form id="inputForm" class="console-input" autocomplete="off">
         <span class="prompt" aria-hidden="true">›</span>

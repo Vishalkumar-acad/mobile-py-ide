@@ -229,6 +229,13 @@ async function snapshotFiles() {
 async function startRun() {
   switchTab('console');
   clearOutput();
+
+  // On a wide screen the Terminal and REPL get a real terminal emulator.
+  if (isDesktop() && (mode === 'terminal' || mode === 'repl')) {
+    if (await startPtyTerminal(mode)) return;
+  }
+  teardownTerminal();
+
   setRunning(false);
   setStatus('running', 'Starting…');
   runBtn.disabled = true;
@@ -454,6 +461,7 @@ function setMode(next) {
   switchTab('console');
   if (next === 'script' && usingCM) setTimeout(() => cmView.requestMeasure(), 0);
   clearOutput();
+  teardownTerminal();
   const hint = next === 'script' ? 'Press ▶ Run to execute your code.'
     : next === 'repl' ? 'Press ▶ Run to start a Python REPL, then type below.'
       : 'Press ▶ Run to open a terminal, then type commands below.';
@@ -611,6 +619,138 @@ posBtn.addEventListener('click', () => {
   if (runId) inputLine.focus();
 });
 applyInputPos();
+
+/* --------------------- desktop terminal (xterm.js) ------------------- */
+// On a wide screen the Terminal and REPL run under a real pseudoterminal and
+// are drawn by xterm.js: you type straight at the prompt, with working Ctrl+C,
+// arrow-key history and tab completion, and no Send button. If anything about
+// that fails we quietly fall back to the line-based console below.
+const termMount = $('#termMount');
+let term = null;
+let termFit = null;
+let termWs = null;
+let termRunId = null;
+let xtermMods = null;
+
+function isDesktop() {
+  return window.matchMedia('(min-width: 860px)').matches;
+}
+
+function showTerminal(on) {
+  consolePanel.classList.toggle('terminal-mode', on);
+  termMount.hidden = !on;
+}
+
+async function loadXterm() {
+  if (xtermMods) return xtermMods;
+  const [core, addonFit] = await Promise.all([
+    import('https://esm.sh/@xterm/xterm@5.5.0'),
+    import('https://esm.sh/@xterm/addon-fit@0.10.0'),
+  ]);
+  xtermMods = { Terminal: core.Terminal, FitAddon: addonFit.FitAddon };
+  return xtermMods;
+}
+
+function teardownTerminal() {
+  if (termWs) { try { termWs.close(); } catch { /* ignore */ } termWs = null; }
+  termRunId = null;
+  showTerminal(false);
+}
+
+function onTermResize() {
+  if (!termFit || termMount.hidden) return;
+  try { termFit.fit(); } catch { /* ignore */ }
+}
+
+async function startPtyTerminal(nextMode) {
+  try {
+    const { Terminal, FitAddon } = await loadXterm();
+    if (!term) {
+      term = new Terminal({
+        fontSize: 13,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+        cursorBlink: true,
+        scrollback: 2000,
+        theme: {
+          background: '#0d1117',
+          foreground: '#e6edf3',
+          cursor: '#58a6ff',
+          selectionBackground: '#264f78',
+        },
+      });
+      termFit = new FitAddon();
+      term.loadAddon(termFit);
+      term.open(termMount);
+      // One handler for the life of the terminal; it follows the current socket.
+      term.onData((data) => {
+        if (termWs && termWs.readyState === WebSocket.OPEN) {
+          termWs.send(JSON.stringify({ type: 'input', text: data }));
+        }
+      });
+      window.addEventListener('resize', onTermResize);
+    }
+
+    showTerminal(true);
+    try { termFit.fit(); } catch { /* ignore */ }
+    term.reset();
+    term.focus();
+
+    const res = await fetch('/api/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: nextMode, pty: true, cols: term.cols, rows: term.rows }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.runId || !data.pty) throw new Error(data.error || 'no pty session');
+
+    termRunId = data.runId;
+    runId = data.runId;
+    mode = data.mode;
+    setRunning(true);
+    setStatus('running', 'Running');
+
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    termWs = new WebSocket(`${proto}://${location.host}/api/runs/${data.runId}/ws`);
+    termWs.binaryType = 'arraybuffer';
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('socket timed out')), 8000);
+      termWs.onopen = () => { clearTimeout(timer); resolve(); };
+      termWs.onerror = () => { clearTimeout(timer); reject(new Error('socket failed')); };
+    });
+    termWs.onmessage = (ev) => {
+      if (ev.data instanceof ArrayBuffer) { term.write(new Uint8Array(ev.data)); return; }
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'text') term.write(msg.text);
+        else if (msg.type === 'exit') onTerminalExit(msg);
+      } catch { /* ignore */ }
+    };
+    termWs.onclose = () => {
+      if (termRunId) { termRunId = null; runId = null; setRunning(false); }
+    };
+    return true;
+  } catch {
+    const orphan = runId;
+    teardownTerminal();
+    if (orphan) {
+      try { await fetch(`/api/runs/${orphan}/kill`, { method: 'POST' }); } catch { /* ignore */ }
+      runId = null;
+    }
+    return false;
+  }
+}
+
+function onTerminalExit(msg) {
+  const t = msg.elapsed_ms ? ` · ${(msg.elapsed_ms / 1000).toFixed(2)}s` : '';
+  term.write(`\r\n\x1b[2m— session ended — press ▶ Run again\x1b[0m\r\n`);
+  termRunId = null;
+  runId = null;
+  setRunning(false);
+  if (msg.status === 'success') setStatus('success', `✓ Done${t}`);
+  else if (msg.status === 'idle_timeout') setStatus('timeout', `⏱ Stopped: no activity${t}`);
+  else if (msg.status === 'killed') setStatus('error', `■ Stopped${t}`);
+  else setStatus('error', `✗ Error${t} · exit ${msg.exit_code ?? '?'}`);
+}
 
 /* --------------------------- capabilities ---------------------------- */
 (async () => {

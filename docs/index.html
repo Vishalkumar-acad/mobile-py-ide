@@ -106,8 +106,9 @@
   <tr><td><strong>REPL</strong></td><td>An interactive Python prompt. Press Run to start it, then type one line at a time below and see each result immediately — just like Python's <code>&gt;&gt;&gt;</code> prompt. Variables you set stay available for the next line.</td></tr>
   <tr><td><strong>Terminal</strong></td><td>A shell on the server. Type a command, press Enter, read its output. Only shown if it has been enabled.</td></tr>
 </table>
+<p><strong>On a laptop or desktop</strong>, REPL and Terminal open as a <em>real</em> terminal: you type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with arrow-key history, tab completion and Ctrl+C to interrupt — and no Send button. On a phone they stay line-by-line, with the input box you can move above or below the output.</p>
 <div class="card warn">
-  <strong>About the terminal.</strong> Terminal mode is a real shell on the server, so it is <em>off by default</em>. It is only safe while the IDE stays private (for example behind Cloudflare Access). To turn it on, add <code>ALLOW_TERMINAL=true</code> to <code>/opt/mobile-py-ide/.env</code> and restart the service; set it back to <code>false</code> to turn it off.
+  <strong>About the terminal.</strong> Terminal mode is a real shell on the server, so it is <em>off by default</em>. It is only safe while the IDE stays private (for example behind Cloudflare Access). Turn it on from GitHub — Actions &rarr; <em>Run server setup</em> &rarr; set <code>allow_terminal</code> to <code>true</code> — or add <code>ALLOW_TERMINAL=true</code> to <code>/opt/mobile-py-ide/.env</code> and restart the service.
 </div>
 
 <h2 id="input">Input &amp; output</h2>

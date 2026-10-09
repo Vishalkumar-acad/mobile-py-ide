@@ -209,6 +209,18 @@ main {
   font-size: 15px;
 }
 .icon-btn:active { background: var(--accent); color: #fff; }
+
+/* ---------- the real terminal (desktop) ---------- */
+.term-mount {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #0d1117;
+  padding: 4px 0 4px 6px;
+}
+.term-mount .xterm { height: 100%; }
+#console.terminal-mode .console-output,
+#console.terminal-mode .console-input,
+#console.terminal-mode .prefill { display: none; }
 .console-input button {
   flex: 0 0 auto;
   height: 42px;
@@ -445,6 +457,9 @@ textarea, input { font-size: 16px; }
 
 /* ---------- desktop: editor and console side by side ---------- */
 @media (min-width: 860px) {
+  /* Enter already sends the line, so the Send and move buttons are noise. */
+  .console-input #sendBtn,
+  .console-input #posBtn { display: none; }
   .tabs { display: none; }
 
   main { display: flex; flex-direction: row; }

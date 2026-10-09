@@ -167,6 +167,37 @@ personal server. Set `ALLOW_FILE_ACCESS=false` to go back to blocking
 
 Point `WORKSPACE_DIR` at another mount if you attach a bigger disk.
 
+## Modes
+
+| Mode | What it is |
+| --- | --- |
+| **Script** | Write a program and run it; `input()` works live. |
+| **REPL** | An interactive Python prompt. |
+| **Terminal** | A shell on the server (off by default, see below). |
+
+### A real terminal on desktop
+
+On a viewport at least 860 px wide, REPL and Terminal run under a genuine
+**pseudoterminal** and are drawn by [xterm.js](https://xtermjs.org/): you type
+directly at the `$` or `>>>` prompt, with arrow-key history, tab completion and
+Ctrl+C to interrupt. The Send button and the symbol bar are hidden there —
+Enter is the only key you need.
+
+How it fits together:
+
+- `server/pty.js` is a small Python relay that gives the child a pty
+  (`pty.fork()`), sets its size, and forwards bytes both ways. No native Node
+  module is needed. Cleanup is automatic: when the relay exits the pty master
+  closes and the child goes with it.
+- `server/ws.js` is a hand-written WebSocket server, so the project keeps its
+  zero-dependency promise. A terminal needs ordered, low-overhead keystrokes,
+  which is exactly what a socket gives and per-keystroke HTTP does not.
+- The socket carries raw bytes out (binary frames) and JSON in
+  (`{type:'input'}`, `{type:'kill'}`).
+
+Narrow screens keep the simpler line-based console, and if xterm or the socket
+cannot be reached the desktop falls back to that same console.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and edit. Highlights:
