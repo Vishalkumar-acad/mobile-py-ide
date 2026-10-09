@@ -1,0 +1,19 @@
+{
+  "name": "Mobile Py IDE",
+  "short_name": "Py IDE",
+  "description": "Lightweight, sandboxed, mobile-optimized web Python IDE.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230d1117'/%3E%3Ctext x='50' y='50' font-size='60' text-anchor='middle' dominant-baseline='central'%3E%F0%9F%90%8D%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

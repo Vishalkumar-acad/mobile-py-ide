@@ -1,0 +1,36 @@
+# Mobile Py IDE — systemd unit.
+# Install to /etc/systemd/system/mobile-py-ide.service, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mobile-py-ide
+#
+# Edit WorkingDirectory, User and EnvironmentFile to match your server.
+
+[Unit]
+Description=Mobile Py IDE (sandboxed web Python runner)
+After=network.target
+
+[Service]
+Type=simple
+User=mobilepy
+Group=mobilepy
+WorkingDirectory=/opt/mobile-py-ide
+EnvironmentFile=-/opt/mobile-py-ide/.env
+ExecStart=/usr/bin/node server/app.js
+Restart=on-failure
+RestartSec=2
+
+# --- hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

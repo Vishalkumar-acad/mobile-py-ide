@@ -1,0 +1,25 @@
+{
+  "name": "mobile-py-ide",
+  "version": "1.0.0",
+  "description": "Lightweight, sandboxed, mobile-optimized web Python IDE for personal use. Zero npm dependencies.",
+  "type": "module",
+  "main": "server/app.js",
+  "scripts": {
+    "start": "node server/app.js",
+    "dev": "node --watch server/app.js",
+    "test": "node test/run-tests.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "keywords": [
+    "python",
+    "ide",
+    "mobile",
+    "sandbox",
+    "code-runner"
+  ],
+  "license": "MIT",
+  "private": false
+}
