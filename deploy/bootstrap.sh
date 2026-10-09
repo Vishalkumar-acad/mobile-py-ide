@@ -101,10 +101,14 @@ MAX_QUEUE=8
 STRICT_MODE=false
 PYTHON_BIN=${VENV_PY}
 EOF
-  chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 else
   log "$APP_DIR/.env already exists, leaving it untouched"
+  if ! grep -q '^PYTHON_BIN=' "$APP_DIR/.env"; then
+    echo "PYTHON_BIN=${VENV_PY}" >> "$APP_DIR/.env"
+    log "Added PYTHON_BIN=${VENV_PY} to the existing .env"
+  fi
 fi
+chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 
 # --- 6. systemd service -------------------------------------------------
 log "Installing systemd unit /etc/systemd/system/${SERVICE_NAME}.service"
