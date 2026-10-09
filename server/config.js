@@ -72,6 +72,11 @@ const config = {
   rateWindowMs: num('RATE_WINDOW_MS', 60 * 1000),
   rateMax: num('RATE_MAX', 60),
 
+  // Concurrency guard — protects a small (e.g. 2 GB) server from memory
+  // pressure by running only a few programs at once and queueing the rest.
+  maxConcurrentRuns: num('MAX_CONCURRENT_RUNS', 2),
+  maxQueue: num('MAX_QUEUE', 8),
+
   // Validation policy
   // STRICT_MODE=true -> only modules in allowedModules may be imported.
   strictMode: bool('STRICT_MODE', false),

@@ -94,11 +94,35 @@ Copy `.env.example` to `.env` and edit. Highlights:
 | `DISABLE_NETWORK` | `false` | Wrap the runner in `unshare -n` (needs root or userns) |
 | `RUN_AS_UID` / `RUN_AS_GID` | – | Run the runner as a low-privilege user |
 | `RATE_MAX` | `60` | Max runs per IP per `RATE_WINDOW_MS` |
+| `MAX_CONCURRENT_RUNS` | `2` | Programs executing at the same time (memory guard) |
+| `MAX_QUEUE` | `8` | Runs allowed to wait for a free slot before a 429 |
 
 > **Note on the memory cap.** The sandbox default is 128 MB. Small scripts and
 > `math`/`random`/`json` run comfortably, but `numpy` can reserve a lot of
 > virtual memory and may need a higher `MEMORY_LIMIT_MB`. Raise it if a light
 > library fails to import; the cap exists to stop runaway loops, not to be tiny.
+
+## Server sizing
+
+This IDE is deliberately small. A **2 GB RAM / 5 GB disk** VPS is more than
+enough for personal use — the app is ~50 KB of code, Node idles at ~60–80 MB,
+and each run is capped at `MEMORY_LIMIT_MB`. There is no `node_modules` (the
+backend has zero dependencies) and the editor is loaded from a CDN, so nothing
+heavy is stored on disk.
+
+- **Concurrency.** `MAX_CONCURRENT_RUNS` (default `2`) keeps a small server
+  safe: at most two programs execute at once, the rest wait in a short queue.
+  On 2 GB you can raise it to 3–4 if you like, but 2 is a sensible default.
+- **Swap.** Add 1–2 GB of swap so a memory spike slows the box down instead of
+  triggering the OOM killer:
+
+  ```bash
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+  ```
 
 ## Deploying on a VPS
 

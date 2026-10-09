@@ -86,6 +86,34 @@ function clientIp(req) {
   return req.socket.remoteAddress || 'unknown';
 }
 
+// --- concurrency guard ----------------------------------------------
+// Keeps at most `maxConcurrentRuns` programs executing at once and holds
+// the rest in a bounded queue. Important on a small server: N concurrent
+// runs each capped at MEMORY_LIMIT_MB would otherwise add up fast.
+let activeRuns = 0;
+const runQueue = [];
+
+function acquireSlot() {
+  return new Promise((resolve, reject) => {
+    if (activeRuns < config.maxConcurrentRuns) {
+      activeRuns += 1;
+      resolve();
+      return;
+    }
+    if (runQueue.length >= config.maxQueue) {
+      reject(new Error('BUSY'));
+      return;
+    }
+    runQueue.push(resolve);
+  });
+}
+
+function releaseSlot() {
+  const next = runQueue.shift();
+  if (next) next(); // hand the slot straight to the next waiter
+  else activeRuns -= 1;
+}
+
 // --- static files -------------------------------------------------------
 async function serveStatic(req, res) {
   let urlPath;
@@ -173,8 +201,21 @@ const server = http.createServer(async (req, res) => {
         return json(res, 400, { status: 'rejected', error: `Error: ${verdict.reason}` });
       }
 
-      const result = await execute({ code, stdin });
-      return json(res, 200, result);
+      try {
+        await acquireSlot();
+      } catch {
+        return json(res, 429, {
+          status: 'error',
+          error: 'Server is busy running other programs. Please try again in a moment.',
+        });
+      }
+
+      try {
+        const result = await execute({ code, stdin });
+        return json(res, 200, result);
+      } finally {
+        releaseSlot();
+      }
     }
 
     if (req.method === 'GET' || req.method === 'HEAD') {
