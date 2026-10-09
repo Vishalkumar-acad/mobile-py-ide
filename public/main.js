@@ -647,6 +647,21 @@ let termFit = null;
 let termWs = null;
 let termRunId = null;
 let xtermMods = null;
+// Whether the program in the terminal has asked for bracketed paste. bash does,
+// and pasted text should then arrive wrapped in the markers it expects.
+let bracketedPaste = false;
+const termDecoder = new TextDecoder();
+
+function sendTermInput(text) {
+  if (termWs && termWs.readyState === WebSocket.OPEN) {
+    termWs.send(JSON.stringify({ type: 'input', text }));
+  }
+}
+
+function noteTermModes(text) {
+  if (text.includes('\x1b[?2004h')) bracketedPaste = true;
+  if (text.includes('\x1b[?2004l')) bracketedPaste = false;
+}
 
 function isDesktop() {
   return window.matchMedia('(min-width: 860px)').matches;
@@ -698,16 +713,37 @@ async function startPtyTerminal(nextMode) {
       term.loadAddon(termFit);
       term.open(termMount);
       // One handler for the life of the terminal; it follows the current socket.
-      term.onData((data) => {
-        if (termWs && termWs.readyState === WebSocket.OPEN) {
-          termWs.send(JSON.stringify({ type: 'input', text: data }));
-        }
+      term.onData(sendTermInput);
+
+      // Paste. Ctrl+V only pastes when the terminal's hidden textarea holds
+      // focus, which is easy to lose — so take the paste event over ourselves in
+      // the capture phase. That makes it work wherever the click landed, and
+      // stops xterm from handling the same paste a second time.
+      termMount.addEventListener('paste', (e) => {
+        const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+        if (!text) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendTermInput(bracketedPaste ? `\x1b[200~${text}\x1b[201~` : text);
+      }, true);
+      // Clicking the padding around the terminal should focus it too.
+      termMount.addEventListener('mousedown', (e) => {
+        if (e.target === termMount) { try { term.focus(); } catch { /* ignore */ } }
       });
+      // Ctrl+V / Cmd+V pressed before the terminal has focus: give it focus, so
+      // the paste lands here rather than nowhere.
+      termMount.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+          try { term.focus(); } catch { /* ignore */ }
+        }
+      }, true);
+
       window.addEventListener('resize', onTermResize);
     }
 
     showTerminal(true);
     try { termFit.fit(); } catch { /* ignore */ }
+    bracketedPaste = false;
     term.reset();
     term.focus();
 
@@ -734,10 +770,15 @@ async function startPtyTerminal(nextMode) {
       termWs.onerror = () => { clearTimeout(timer); reject(new Error('socket failed')); };
     });
     termWs.onmessage = (ev) => {
-      if (ev.data instanceof ArrayBuffer) { term.write(new Uint8Array(ev.data)); return; }
+      if (ev.data instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(ev.data);
+        noteTermModes(termDecoder.decode(bytes));
+        term.write(bytes);
+        return;
+      }
       try {
         const msg = JSON.parse(ev.data);
-        if (msg.type === 'text') term.write(msg.text);
+        if (msg.type === 'text') { noteTermModes(msg.text); term.write(msg.text); }
         else if (msg.type === 'exit') onTerminalExit(msg);
       } catch { /* ignore */ }
     };

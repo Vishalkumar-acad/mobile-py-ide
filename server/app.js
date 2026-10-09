@@ -202,7 +202,7 @@ function resolveMode(payload) {
   if (mode === 'terminal') {
     if (!config.allowTerminal) return { error: 'Terminal mode is turned off on this server.' };
     const opts = wantPty
-      ? { kind: 'pty', ptyCmd: 'bash --norc -i', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb }
+      ? { kind: 'pty', ptyCmd: 'bash -i', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb }
       : { kind: 'bash', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb };
     return { mode, code: '', opts, skipValidation: true, pty: wantPty };
   }

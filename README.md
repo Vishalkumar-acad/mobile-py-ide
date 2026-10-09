@@ -198,6 +198,12 @@ How it fits together:
 Narrow screens keep the simpler line-based console, and if xterm or the socket
 cannot be reached the desktop falls back to that same console.
 
+**Pasting** works with Ctrl+V (or Cmd+V, or the right-click menu). The terminal
+handles the paste event itself rather than relying on xterm's hidden textarea
+holding focus, so a paste lands whatever part of the panel you clicked last, and
+it is never sent twice. Multi-line pastes and the shell's bracketed-paste mode
+are handled too.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and edit. Highlights:
