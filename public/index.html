@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#0d1117" />
   <meta name="color-scheme" content="dark" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -50,9 +50,11 @@
 
       <form id="inputForm" class="console-input" autocomplete="off">
         <span class="prompt" aria-hidden="true">›</span>
-        <input id="inputLine" type="text" placeholder="Type input, then press Enter" disabled
-          autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <textarea id="inputLine" rows="1" placeholder="Type here…"
+          autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" disabled></textarea>
         <button id="sendBtn" type="submit" disabled>Send</button>
+        <button id="posBtn" type="button" class="icon-btn" title="Move the input above the output"
+          aria-label="Move the input above the output">⇅</button>
       </form>
 
       <details class="prefill" id="prefillDetails">

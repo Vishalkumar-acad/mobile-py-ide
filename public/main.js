@@ -29,6 +29,8 @@ const clearBtn = $('#clearBtn');
 const inputForm = $('#inputForm');
 const inputLine = $('#inputLine');
 const sendBtn = $('#sendBtn');
+const posBtn = $('#posBtn');
+const consolePanel = $('#console');
 const prefillDetails = $('#prefillDetails');
 const prefillCount = $('#prefillCount');
 const prefillClear = $('#prefillClear');
@@ -197,7 +199,7 @@ function setRunning(on) {
   inputLine.disabled = !on;
   sendBtn.disabled = !on;
   inputRow.classList.toggle('active', on);
-  if (!on) inputLine.value = '';
+  if (!on) { inputLine.value = ''; inputLine.style.height = ''; }
 }
 
 function onRunClick() {
@@ -378,11 +380,25 @@ async function startRunLegacy(code, prefill) {
 }
 
 /* input line */
+// Enter sends; the box grows as you type so a long command is readable.
+inputLine.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (typeof inputForm.requestSubmit === 'function') inputForm.requestSubmit();
+    else inputForm.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+});
+inputLine.addEventListener('input', () => {
+  inputLine.style.height = 'auto';
+  inputLine.style.height = `${Math.min(inputLine.scrollHeight, 110)}px`;
+});
+
 inputForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!runId) return;
   const value = inputLine.value;
   inputLine.value = '';
+  inputLine.style.height = '';
   appendOutput((mode === 'terminal' ? '$ ' : '') + value + '\n', 'echo');
   try {
     await fetch(`/api/runs/${runId}/input`, {
@@ -575,6 +591,26 @@ async function uploadFiles() {
 
 filesBtn.addEventListener('click', openFiles);
 uploadBtn.addEventListener('click', uploadFiles);
+
+/* -------------------- where the input line sits ----------------------- */
+// On a phone the keyboard covers the bottom of the screen, so let the input
+// sit above the output instead. The choice is remembered.
+let inputOnTop = false;
+try { inputOnTop = localStorage.getItem('mobi-py-input-top') === '1'; } catch { /* ignore */ }
+function applyInputPos() {
+  consolePanel.classList.toggle('input-top', inputOnTop);
+  posBtn.textContent = inputOnTop ? '⇵' : '⇅';
+  const label = inputOnTop ? 'Move the input below the output' : 'Move the input above the output';
+  posBtn.title = label;
+  posBtn.setAttribute('aria-label', label);
+}
+posBtn.addEventListener('click', () => {
+  inputOnTop = !inputOnTop;
+  try { localStorage.setItem('mobi-py-input-top', inputOnTop ? '1' : '0'); } catch { /* ignore */ }
+  applyInputPos();
+  if (runId) inputLine.focus();
+});
+applyInputPos();
 
 /* --------------------------- capabilities ---------------------------- */
 (async () => {
