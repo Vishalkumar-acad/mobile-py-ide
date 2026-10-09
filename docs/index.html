@@ -62,6 +62,7 @@
     <a href="#start">Getting started</a>
     <a href="#screen">The screen</a>
     <a href="#modes">Modes</a>
+    <a href="#terminal">Desktop terminal</a>
     <a href="#input">Input &amp; output</a>
     <a href="#libraries">Libraries</a>
     <a href="#packages">Installing packages</a>
@@ -72,6 +73,10 @@
     <a href="#host">Self-hosting</a>
   </nav>
 </header>
+
+<div class="card ok">
+  <strong>New — the desktop terminal.</strong> On a laptop or desktop, REPL and Terminal now open as a <em>real</em> terminal: type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt, arrow-key history, <kbd>Tab</kbd> completion and working paste. There is no Send button. Phones keep the lighter line-by-line console. Details in <a href="#terminal">The desktop terminal</a>.
+</div>
 
 <h2 id="start">Getting started</h2>
 <p>Open the IDE in your browser — on a phone it looks like this:</p>
@@ -88,13 +93,14 @@
   <tr><td><strong>▶ Run</strong></td><td>Runs the code. While a program is running it turns into <strong>■ Stop</strong>.</td></tr>
   <tr><td><strong>Clear</strong></td><td>Empties the console.</td></tr>
   <tr><td><strong>Symbol bar</strong></td><td>The scrollable row at the bottom with <code>:</code> <code>(</code> <code>"</code> <code>_</code> and shortcuts like <code>print()</code>, <code>input()</code>, <code>for</code>, <code>if</code>. Tap to insert at the cursor — no keyboard switching needed.</td></tr>
-  <tr><td><strong>› input line</strong></td><td>Where you type answers to a running program (see below).</td></tr>
+  <tr><td><strong>› input line</strong></td><td>Where you type answers to a running program (see below). On a desktop in REPL or Terminal mode this is replaced by the real terminal.</td></tr>
   <tr><td><strong>Pre-fill input</strong></td><td>Optional: lines sent to the program the moment it starts.</td></tr>
 </table>
+<p>On a desktop the <strong>Send</strong> button and the <strong>⇅</strong> move button are hidden — <kbd>Enter</kbd> sends the line, so there is nothing to reach for.</p>
 <p>On a desktop it becomes a two-pane layout — editor on the left, console on the right:</p>
 <figure>
   <img class="shot" src="screenshot-desktop.png" alt="The IDE on a desktop browser, editor left and console right" />
-  <figcaption>The same page on a desktop.</figcaption>
+  <figcaption>The same page on a desktop — editor on the left, console on the right.</figcaption>
 </figure>
 <p>Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or <kbd>Cmd</kbd>+<kbd>Enter</kbd>) to run without reaching for the button. Your code is saved in the browser automatically, so it is still there when you come back.</p>
 
@@ -106,9 +112,32 @@
   <tr><td><strong>REPL</strong></td><td>An interactive Python prompt. Press Run to start it, then type one line at a time below and see each result immediately — just like Python's <code>&gt;&gt;&gt;</code> prompt. Variables you set stay available for the next line.</td></tr>
   <tr><td><strong>Terminal</strong></td><td>A shell on the server. Type a command, press Enter, read its output. Only shown if it has been enabled.</td></tr>
 </table>
-<p><strong>On a laptop or desktop</strong>, REPL and Terminal open as a <em>real</em> terminal: you type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with arrow-key history, tab completion and Ctrl+C to interrupt — and no Send button. On a phone they stay line-by-line, with the input box you can move above or below the output.</p>
+<p><strong>On a laptop or desktop</strong>, REPL and Terminal open as a <em>real</em> terminal: you type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with arrow-key history, tab completion and Ctrl+C to interrupt — and no Send button. On a phone they stay line-by-line, with the input box you can move above or below the output. Full details in <a href="#terminal">The desktop terminal</a>.</p>
 <div class="card warn">
   <strong>About the terminal.</strong> Terminal mode is a real shell on the server, so it is <em>off by default</em>. It is only safe while the IDE stays private (for example behind Cloudflare Access). Turn it on from GitHub — Actions &rarr; <em>Run server setup</em> &rarr; set <code>allow_terminal</code> to <code>true</code> — or add <code>ALLOW_TERMINAL=true</code> to <code>/opt/mobile-py-ide/.env</code> and restart the service.
+</div>
+
+<h2 id="terminal">The desktop terminal</h2>
+<p>On a screen at least 860&nbsp;px wide, <strong>REPL</strong> and <strong>Terminal</strong> stop being a text box and become a real terminal. Press <strong>▶ Run</strong> and a genuine prompt appears — <code>$</code> for the shell, <code>&gt;&gt;&gt;</code> for Python — and you type straight at it.</p>
+<figure>
+  <img class="shot" src="screenshot-terminal.png" alt="The Python REPL running as a real terminal on a desktop browser" />
+  <figcaption>The REPL on a desktop: a real <code>&gt;&gt;&gt;</code> prompt, not an input box.</figcaption>
+</figure>
+<table>
+  <tr><th>Key</th><th>What it does</th></tr>
+  <tr><td><kbd>Enter</kbd></td><td>Runs the line.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>Interrupts whatever is running and gives you the prompt back.</td></tr>
+  <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Walks back and forward through your command history.</td></tr>
+  <tr><td><kbd>Tab</kbd></td><td>Completes a file name or command.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Pastes — <kbd>Cmd</kbd>+<kbd>V</kbd> on a Mac, or the right-click menu. Several lines at once are fine.</td></tr>
+</table>
+<p>There is no Send button here: <kbd>Enter</kbd> is the only key you need. The input box and the <strong>⇅</strong> button stay on phones, where they are the right tool.</p>
+<p>On a narrow screen the real terminal is not used at all — you get the lighter line-by-line console, which is kinder to a phone's memory and battery and starts instantly. If the terminal cannot load for any reason, a desktop quietly falls back to that same console.</p>
+<div class="card ok">
+  <strong>How it works.</strong> The run happens under a real pseudoterminal, so the program behaves exactly as it would in a terminal window — prompts, colours, line editing and all — and the terminal itself is drawn by <a href="https://xtermjs.org/">xterm.js</a>. Nothing native is installed on the server for this: it is a small Python relay plus a hand-written WebSocket, so the project keeps its no-dependency promise.
+</div>
+<div class="card warn">
+  <strong>Switching modes ends the old session.</strong> If you move from Terminal to REPL (or the other way round), the previous session is closed — press <strong>▶ Run</strong> to start the new one. This stops a shell from quietly receiving the lines you meant for Python.
 </div>
 
 <h2 id="input">Input &amp; output</h2>
@@ -186,6 +215,9 @@ print(open("notes.txt").read())</code></pre>
   <tr><td><em>Server is busy…</em></td><td>Two programs were already running. Wait a moment and press Run again.</td></tr>
   <tr><td><em>Terminal mode is turned off</em></td><td>Terminal mode is opt-in for safety. See the note in <a href="#modes">Modes</a>.</td></tr>
   <tr><td><em>not on the allowed list</em></td><td>That package is not in the reviewed set. Use one of the chips, or add it to <code>EXTRA_PACKAGES</code> on the server.</td></tr>
+  <tr><td>Paste does nothing in the terminal</td><td>Click once inside the terminal, then paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. The terminal now takes focus by itself, so this should not happen — but a click always fixes it.</td></tr>
+  <tr><td>A <code>$</code> prompt appears in REPL mode</td><td>That is the shell, so check which mode button is highlighted. Changing mode also ends the old session, so press <strong>▶ Run</strong> again to get a fresh <code>&gt;&gt;&gt;</code>.</td></tr>
+  <tr><td>The old session keeps answering after you switch mode</td><td>Changing mode ends the previous session. Press <strong>▶ Run</strong> to start the new one.</td></tr>
 </table>
 
 <h2 id="api">API</h2>
@@ -193,8 +225,9 @@ print(open("notes.txt").read())</code></pre>
   <tr><th>Method &amp; path</th><th>Purpose</th></tr>
   <tr><td><code>GET /api/health</code></td><td>Service status and limits.</td></tr>
   <tr><td><code>POST /api/run</code></td><td>One-shot: send <code>{code, stdin}</code>, get the full result as JSON.</td></tr>
-  <tr><td><code>POST /api/runs</code></td><td>Start a run; body <code>{code, stdin?, mode}</code> where mode is <code>script</code>, <code>repl</code> or <code>terminal</code>. Returns <code>{runId}</code>.</td></tr>
+  <tr><td><code>POST /api/runs</code></td><td>Start a run; body <code>{code, stdin?, mode, pty?, cols?, rows?}</code> where mode is <code>script</code>, <code>repl</code> or <code>terminal</code>. Add <code>pty: true</code> for a real terminal. Returns <code>{runId, mode, pty}</code>.</td></tr>
   <tr><td><code>GET /api/runs/:id/events</code></td><td>Server-Sent Events stream of output and the final exit.</td></tr>
+  <tr><td><code>WS /api/runs/:id/ws</code></td><td>Attach to a run's terminal: raw bytes out, JSON in — <code>{type:&quot;input&quot;,text}</code> or <code>{type:&quot;kill&quot;}</code>. Used with <code>pty: true</code>.</td></tr>
   <tr><td><code>POST /api/runs/:id/input</code></td><td>Send <code>{data}</code> to the running program.</td></tr>
   <tr><td><code>POST /api/runs/:id/kill</code></td><td>Stop the run.</td></tr>
   <tr><td><code>GET /api/packages</code></td><td>The allowed package list.</td></tr>
