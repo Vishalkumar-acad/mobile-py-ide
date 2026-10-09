@@ -217,6 +217,16 @@ check('accepts underscore spelling', () => assert.equal(isAllowed('python_dateut
 check('refuses a heavy package', () => assert.equal(isAllowed('torch'), false));
 check('refuses shell metacharacters', () => assert.equal(isAllowed('rich; rm -rf /'), false));
 check('refuses an unknown name', () => assert.equal(isAllowed('definitely-not-a-real-pkg'), false));
+check('allows the packages added later', () => {
+  for (const p of ['python-slugify', 'pylightxl', 'humanfriendly']) {
+    assert.equal(isAllowed(p), true, `${p} should be allowed`);
+  }
+});
+check('typing "slugify" resolves to python-slugify', () => {
+  assert.equal(isAllowed('slugify'), true);
+  assert.equal(isAllowed('Slugify'), true);
+  assert.equal(isAllowed('slugify; rm -rf /'), false);
+});
 
 console.log('\nWorkspace files');
 check('rejects path traversal and absolute names', () => {

@@ -63,6 +63,8 @@ const BASE_PACKAGES = [
   'python-dotenv', 'more-itertools', 'sortedcontainers', 'faker', 'validators',
   'markdown', 'jinja2', 'qrcode', 'names', 'wonderwords', 'halo',
   'alive-progress', 'questionary', 'rich-argparse',
+  // Added later — all pure Python, none of them heavy.
+  'python-slugify', 'pylightxl', 'humanfriendly',
 ];
 
 // Modules that only make sense once programs are allowed to touch files.

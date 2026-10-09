@@ -15,13 +15,26 @@ function norm(n) {
   return String(n).toLowerCase().replace(/_/g, '-');
 }
 
+// The module you import is often not the distribution you install: `import
+// slugify` comes from the python-slugify distribution. (The bare `slugify`
+// package on PyPI is a Python-2 leftover from 2010 and does not run on
+// Python 3.) Accept either spelling so nobody has to know that.
+const ALIASES = {
+  slugify: 'python-slugify',
+};
+
+function resolveName(name) {
+  return ALIASES[norm(name)] || name;
+}
+
 export function allowlist() {
   return config.packageAllowlist;
 }
 
 export function isAllowed(name) {
   if (typeof name !== 'string' || !NAME_RE.test(name)) return false;
-  return config.packageAllowlist.some((p) => norm(p) === norm(name));
+  const target = resolveName(name);
+  return config.packageAllowlist.some((p) => norm(p) === norm(target));
 }
 
 /**
@@ -45,9 +58,10 @@ export function installPackage(name) {
   const memKb = Math.max(64, Math.round(config.packageMemoryMb)) * 1024;
   const cpuSec = Math.max(10, Math.ceil(config.packageTimeoutMs / 1000) + 2);
   // `name` is already constrained to a safe character set, so this is safe.
+  const target = resolveName(name);
   const script =
     `ulimit -v ${memKb} 2>/dev/null; ulimit -t ${cpuSec} 2>/dev/null; ` +
-    `exec ${config.pythonBin} -m pip install --no-input --disable-pip-version-check --no-cache-dir ${name}`;
+    `exec ${config.pythonBin} -m pip install --no-input --disable-pip-version-check --no-cache-dir ${target}`;
 
   return new Promise((resolve) => {
     // Minimal environment, but pass through proxy settings if the host uses one.
