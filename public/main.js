@@ -57,6 +57,7 @@ let outputEmpty = true;
 let mode = 'script';
 let receivedEvents = false;
 let spaceTtlHours = 24;
+let filesAtStart = null;
 
 /* ----------------------------- editor -------------------------------- */
 function loadStored(key, def) {
@@ -213,6 +214,16 @@ function looksLikePastedCode(code, prefill) {
   return preLines.every((l) => codeLines.includes(l));
 }
 
+async function snapshotFiles() {
+  try {
+    const r = await fetch('/api/files');
+    const d = await r.json();
+    return new Set((d.files || []).map((f) => f.name));
+  } catch {
+    return null;
+  }
+}
+
 async function startRun() {
   switchTab('console');
   clearOutput();
@@ -235,6 +246,9 @@ async function startRun() {
 
   if (mode === 'repl') appendOutput('Python REPL — type an expression and press Enter.\n', 'muted');
   if (mode === 'terminal') appendOutput('Terminal — type a shell command and press Enter.\n', 'muted');
+
+  // Remember what is already in the space, so we can tell you about new files.
+  filesAtStart = mode === 'script' ? await snapshotFiles() : null;
 
   if (!window.EventSource) return startRunLegacy(code, prefill);
 
@@ -308,6 +322,7 @@ function finishRun(e) {
   if (es) { es.close(); es = null; }
   runId = null;
   setRunning(false);
+  reportNewFiles();
   const t = e.elapsed_ms ? ` · ${(e.elapsed_ms / 1000).toFixed(2)}s` : '';
   if (e.status === 'success') setStatus('success', `✓ Done${t} · exit ${e.exit_code ?? 0}`);
   else if (e.status === 'idle_timeout') setStatus('timeout', `⏱ Stopped: no activity${t}`);
@@ -316,6 +331,21 @@ function finishRun(e) {
   else if (e.status === 'killed') setStatus('error', `■ Stopped${t}`);
   else setStatus('error', `✗ Error${t} · exit ${e.exit_code ?? '?'}`);
   if (e.truncated) appendOutput('\n… output truncated.', 'muted');
+}
+
+// After a run, say so if the program saved anything — otherwise it is easy to
+// think nothing happened.
+function reportNewFiles() {
+  const before = filesAtStart;
+  filesAtStart = null;
+  if (!before) return;
+  snapshotFiles().then((now) => {
+    if (!now) return;
+    const added = [...now].filter((n) => !before.has(n));
+    if (added.length) {
+      appendOutput(`\n📄 saved in your space: ${added.join(', ')} — tap Files to open\n`, 'muted');
+    }
+  });
 }
 
 async function stopRun() {

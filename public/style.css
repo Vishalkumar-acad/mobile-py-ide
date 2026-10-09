@@ -52,9 +52,10 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
   box-sizing: content-box;
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; }
-.brand .logo { font-size: 18px; }
-.actions { display: flex; align-items: center; gap: 8px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; min-width: 0; }
+.brand .logo { font-size: 18px; flex: 0 0 auto; }
+.brand-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
 .run-btn {
   display: inline-flex;
@@ -405,6 +406,16 @@ textarea, input { font-size: 16px; }
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Narrow phones: the header has four buttons, so drop the wordmark and
+   tighten everything up rather than letting a button fall off the edge. */
+@media (max-width: 540px) {
+  .topbar { padding: 0 8px; }
+  .brand-text { display: none; }
+  .actions { gap: 6px; }
+  .ghost-btn { padding: 0 9px; font-size: 13px; }
+  .run-btn { padding: 0 12px; min-width: 68px; font-size: 14px; }
 }
 
 /* ---------- desktop: editor and console side by side ---------- */
