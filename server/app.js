@@ -23,6 +23,7 @@ import { createRun, getRun } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
 import { allowlist, installPackage } from './packages.js';
 import { listFiles, readFile, writeFile, deleteFile, safePath, ensureWorkspace, limitBytes, totalSize } from './files.js';
+import { diagnostics } from './diag.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -238,6 +239,11 @@ const server = http.createServer(async (req, res) => {
         memory_limit_mb: config.memoryLimitMb,
         strict_mode: config.strictMode,
       });
+    }
+
+    // ---- self-check ----
+    if (req.method === 'GET' && url.pathname === '/api/diag') {
+      return json(res, 200, await diagnostics());
     }
 
     // ---- packages ----

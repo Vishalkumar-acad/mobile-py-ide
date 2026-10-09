@@ -70,6 +70,9 @@ jobs:
           for i in 1 2 3 4 5; do
             if curl -fsS "$HEALTH_URL"; then
               echo
+              echo "==> Diagnostics"
+              curl -fsS "${HEALTH_URL%health}diag" || true
+              echo
               echo "==> Deploy OK"
               exit 0
             fi
