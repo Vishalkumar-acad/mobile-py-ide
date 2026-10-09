@@ -230,8 +230,12 @@ export async function createRun(code, opts = {}) {
     touchIdle();
   }
 
+  // The venv's bin comes first so `python3` and `pip` inside the terminal mean
+  // the same interpreter the IDE installs packages into — otherwise a typed
+  // `pip uninstall` would quietly target the system Python instead.
+  const pythonDir = config.pythonBin.includes('/') ? path.dirname(config.pythonBin) : '';
   const env = {
-    PATH: '/usr/local/bin:/usr/bin:/bin',
+    PATH: pythonDir ? `${pythonDir}:/usr/local/bin:/usr/bin:/bin` : '/usr/local/bin:/usr/bin:/bin',
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
     HOME: workDir,

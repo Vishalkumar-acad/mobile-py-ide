@@ -108,10 +108,10 @@
 
   <dialog id="pkgDialog" class="dialog">
     <form method="dialog" class="dialog-head">
-      <h2>Install a package</h2>
+      <h2>Packages</h2>
       <button class="mini-btn" type="submit">Close</button>
     </form>
-    <p class="dialog-note">Only light, allow-listed packages can be installed from here. Heavy libraries (torch, tensorflow, pandas, …) are never allowed.</p>
+    <p class="dialog-note">Only light, allow-listed packages can be installed from here. Heavy libraries (torch, tensorflow, pandas, …) are never allowed. Anything you install can be taken back out again.</p>
     <div class="pkg-row">
       <input id="pkgInput" list="pkgList" placeholder="package name"
         autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" />
@@ -119,6 +119,8 @@
       <button id="pkgInstall" type="button" class="run-btn small">Install</button>
     </div>
     <div class="pkg-allowed" id="pkgAllowed"></div>
+    <div class="pkg-installed-head">Installed — tap ✕ to remove</div>
+    <div class="pkg-installed" id="pkgInstalled"></div>
     <pre id="pkgOut" class="pkg-out" hidden></pre>
   </dialog>
 

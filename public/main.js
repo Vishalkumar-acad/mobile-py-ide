@@ -44,6 +44,7 @@ const pkgInput = $('#pkgInput');
 const pkgInstall = $('#pkgInstall');
 const pkgOut = $('#pkgOut');
 const pkgAllowed = $('#pkgAllowed');
+const pkgInstalled = $('#pkgInstalled');
 const filesBtn = $('#filesBtn');
 const filesDialog = $('#filesDialog');
 const fileInput = $('#fileInput');
@@ -508,6 +509,53 @@ async function openPackages() {
       pkgAllowed.appendChild(c);
     });
   } catch { /* ignore */ }
+  loadInstalled();
+}
+
+// What is in the venv right now, each with a way to take it back out.
+async function loadInstalled() {
+  pkgInstalled.textContent = '';
+  try {
+    const res = await fetch('/api/packages/installed');
+    const d = await res.json();
+    const list = d.packages || [];
+    if (!list.length) {
+      pkgInstalled.textContent = 'Nothing installed yet.';
+      return;
+    }
+    list.forEach((p) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.textContent = `${p.name} ✕`;
+      b.title = `Remove ${p.name}${p.version ? ` ${p.version}` : ''}`;
+      b.addEventListener('click', () => removePackage(p.name, b));
+      pkgInstalled.appendChild(b);
+    });
+  } catch {
+    pkgInstalled.textContent = 'Could not read the list.';
+  }
+}
+
+async function removePackage(name, btn) {
+  if (!window.confirm(`Remove ${name} from the server?`)) return;
+  btn.disabled = true;
+  pkgOut.hidden = false;
+  pkgOut.textContent = `Removing ${name}…`;
+  try {
+    const res = await fetch('/api/packages/uninstall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const d = await res.json();
+    pkgOut.textContent = (d.ok ? `✓ ${name} removed.\n\n` : `✗ ${d.error || 'failed'}\n\n`) + (d.output || '');
+  } catch (err) {
+    pkgOut.textContent = 'Network error: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    loadInstalled();
+  }
 }
 async function installPackage() {
   const name = pkgInput.value.trim();
@@ -523,6 +571,7 @@ async function installPackage() {
     });
     const d = await res.json();
     pkgOut.textContent = (d.ok ? `✓ ${name} installed.\n\n` : `✗ ${d.error || 'failed'}\n\n`) + (d.output || '');
+    if (d.ok) loadInstalled();
   } catch (err) {
     pkgOut.textContent = 'Network error: ' + err.message;
   } finally {

@@ -204,6 +204,18 @@ holding focus, so a paste lands whatever part of the panel you clicked last, and
 it is never sent twice. Multi-line pastes and the shell's bracketed-paste mode
 are handled too.
 
+Inside the terminal the venv's `bin` is first on `PATH`, so `python3` and `pip`
+there mean the same interpreter the IDE installs packages into — a typed
+`pip uninstall` hits the right environment.
+
+## Packages
+
+`GET /api/packages/installed` lists what is in the venv (pip's own scaffolding
+hidden) and `POST /api/packages/uninstall {name}` takes one back out, so the
+Packages dialog can offer an ✕ beside each installed package. Removing a package
+is not a security question, so any well-formed name is accepted — not just the
+allow-list.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and edit. Highlights:

@@ -10,7 +10,9 @@
 //   POST /api/runs/:id/input { data }   -> feed a line to the running program
 //   POST /api/runs/:id/kill             -> stop the running program
 //   GET  /api/packages                  -> allowed packages
+//   GET  /api/packages/installed        -> what is installed in the venv
 //   POST /api/packages { name }         -> install an allow-listed package
+//   POST /api/packages/uninstall { name } -> remove a package
 
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -21,7 +23,7 @@ import { validate } from './validator.js';
 import { execute } from './executor.js';
 import { createRun, getRun, killRunsForSpace } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
-import { allowlist, installPackage } from './packages.js';
+import { allowlist, installPackage, uninstallPackage, listInstalled } from './packages.js';
 import { listFiles, readFile, writeFile, deleteFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
 import { diagnostics } from './diag.js';
 import { identify, touch, startSweeper, perUserLimitBytes } from './spaces.js';
@@ -257,6 +259,20 @@ const server = http.createServer(async (req, res) => {
         enabled: config.allowPackageInstall,
         allowlist: allowlist(),
       });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/packages/installed') {
+      if (!config.allowPackageInstall) return json(res, 200, { packages: [] });
+      return json(res, 200, { packages: await listInstalled() });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/packages/uninstall') {
+      if (isRateLimited(clientIp(req))) {
+        return json(res, 429, { ok: false, error: 'Too many requests, please slow down.' });
+      }
+      const payload = await parseJsonBody(req, res, 4096);
+      if (!payload) return undefined;
+      const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+      const result = await uninstallPackage(name);
+      return json(res, result.ok ? 200 : 400, result);
     }
     if (req.method === 'POST' && url.pathname === '/api/packages') {
       if (isRateLimited(clientIp(req))) {

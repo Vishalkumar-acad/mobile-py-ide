@@ -132,6 +132,7 @@
   <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Pastes — <kbd>Cmd</kbd>+<kbd>V</kbd> on a Mac, or the right-click menu. Several lines at once are fine.</td></tr>
 </table>
 <p>There is no Send button here: <kbd>Enter</kbd> is the only key you need. The input box and the <strong>⇅</strong> button stay on phones, where they are the right tool.</p>
+<p>Inside the terminal, <code>python3</code> and <code>pip</code> are the IDE's own interpreter — not the system one — so <code>pip list</code>, <code>pip install</code> and <code>pip uninstall</code> typed there act on exactly the packages your code imports.</p>
 <p>On a narrow screen the real terminal is not used at all — you get the lighter line-by-line console, which is kinder to a phone's memory and battery and starts instantly. If the terminal cannot load for any reason, a desktop quietly falls back to that same console.</p>
 <div class="card ok">
   <strong>How it works.</strong> The run happens under a real pseudoterminal, so the program behaves exactly as it would in a terminal window — prompts, colours, line editing and all — and the terminal itself is drawn by <a href="https://xtermjs.org/">xterm.js</a>. Nothing native is installed on the server for this: it is a small Python relay plus a hand-written WebSocket, so the project keeps its no-dependency promise.
@@ -170,6 +171,7 @@ print("Hello,", name, "!")</code></pre>
   <li>Type a name — or tap one of the chips, which are exactly the allowed ones.</li>
   <li>Press <strong>Install</strong>. When it finishes, <code>import</code> that package in your code.</li>
 </ol>
+<p><strong>Removing one.</strong> Open <strong>Packages</strong> again — everything currently installed is listed at the bottom, each with an <strong>✕</strong>. Tap it to take that package back out. Nothing here is permanent.</p>
 <p>Only light, well-known packages can be installed. Heavy libraries — <code>torch</code>, <code>tensorflow</code>, <code>pandas</code>, <code>scipy</code> and friends — are refused, because they do not fit a small server and the whole point is to keep it quick.</p>
 <p>Want one that is not on the list? Add it to <code>EXTRA_PACKAGES</code> in <code>.env</code> on the server, or install from a shell:</p>
 <pre><code>sudo bash deploy/add-packages.sh rich tabulate</code></pre>
@@ -231,6 +233,9 @@ print(open("notes.txt").read())</code></pre>
   <tr><td><code>POST /api/runs/:id/input</code></td><td>Send <code>{data}</code> to the running program.</td></tr>
   <tr><td><code>POST /api/runs/:id/kill</code></td><td>Stop the run.</td></tr>
   <tr><td><code>GET /api/packages</code></td><td>The allowed package list.</td></tr>
+  <tr><td><code>GET /api/packages/installed</code></td><td>What is installed in the venv right now.</td></tr>
+  <tr><td><code>POST /api/packages</code></td><td>Install an allow-listed package; body <code>{name}</code>.</td></tr>
+  <tr><td><code>POST /api/packages/uninstall</code></td><td>Remove a package; body <code>{name}</code>.</td></tr>
   <tr><td><code>GET /api/files</code></td><td>List workspace files.</td></tr>
   <tr><td><code>POST /api/files?name=…</code></td><td>Upload a file into the workspace.</td></tr>
   <tr><td><code>GET /api/files/:name</code></td><td>Download a file.</td></tr>

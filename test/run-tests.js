@@ -7,7 +7,7 @@ import { validate } from '../server/validator.js';
 import { execute } from '../server/executor.js';
 import { createRun } from '../server/runs.js';
 import { REPL_SOURCE } from '../server/modes.js';
-import { isAllowed } from '../server/packages.js';
+import { isAllowed, uninstallPackage, listInstalled } from '../server/packages.js';
 import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
 import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
 import config from '../server/config.js';
@@ -226,6 +226,15 @@ check('typing "slugify" resolves to python-slugify', () => {
   assert.equal(isAllowed('slugify'), true);
   assert.equal(isAllowed('Slugify'), true);
   assert.equal(isAllowed('slugify; rm -rf /'), false);
+});
+await checkAsync('refuses to uninstall a malformed name', async () => {
+  const r = await uninstallPackage('bad; rm -rf /');
+  assert.equal(r.ok, false);
+});
+await checkAsync('listInstalled reports the venv without pip scaffolding', async () => {
+  const list = await listInstalled();
+  assert.ok(Array.isArray(list));
+  assert.ok(!list.some((p) => /^(pip|setuptools|wheel)$/i.test(p.name)), 'pip itself should be hidden');
 });
 
 console.log('\nWorkspace files');
