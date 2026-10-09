@@ -126,6 +126,25 @@ heavy is stored on disk.
 
 ## Deploying on a VPS
 
+### One command (Ubuntu / Debian)
+
+On a fresh Ubuntu/Debian server, a bootstrap script does everything: installs
+Node 20, creates a low-privilege user, clones the app to `/opt/mobile-py-ide`,
+installs a hardened systemd service, creates swap if the box has none, and sets
+up nginx on port 80.
+
+```bash
+# review it first, then run
+curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o bootstrap.sh
+less bootstrap.sh
+sudo bash bootstrap.sh
+```
+
+Then open `http://<your-server-ip>/` on your phone. Override settings with env
+vars, e.g. `sudo PORT=8080 SETUP_NGINX=no bash bootstrap.sh`.
+
+### Manually
+
 1. **Install** Node 20+ and Python 3.10+ on the server.
 2. **Copy** the project to e.g. `/opt/mobile-py-ide` and create a `mobilepy`
    user to own it.
