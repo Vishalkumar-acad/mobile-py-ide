@@ -127,10 +127,21 @@ ensure_env() {
     log "Added ${key}=${val} to .env"
   }
 }
-ensure_env PYTHON_BIN "$VENV_PY"
+# Set a setting this script owns, updating it if it is already there.
+set_env() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" "$APP_DIR/.env"; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "$APP_DIR/.env"
+  else
+    echo "${key}=${val}" >> "$APP_DIR/.env"
+  fi
+  log "Set ${key}=${val} in .env"
+}
 ensure_env ALLOW_PACKAGE_INSTALL "true"
 ensure_env ALLOW_TERMINAL "false"
 ensure_env WORKSPACE_DIR "$APP_DIR/workspace"
+# PYTHON_BIN must point at the venv, or pip installs are invisible to programs.
+set_env PYTHON_BIN "$VENV_PY"
 chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 
 # --- 6. systemd service -------------------------------------------------
@@ -208,7 +219,14 @@ server {
 EOF
   ln -sf "/etc/nginx/sites-available/${SERVICE_NAME}" "/etc/nginx/sites-enabled/${SERVICE_NAME}"
   rm -f /etc/nginx/sites-enabled/default
-  nginx -t && systemctl reload nginx
+  nginx -t
+  if systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+    log "nginx reloaded"
+  else
+    warn "nginx is configured but not running — nothing to reload."
+    warn "That is fine when you reach the IDE through a Cloudflare Tunnel."
+  fi
 fi
 
 # --- 9. verify ----------------------------------------------------------
