@@ -157,6 +157,29 @@ vars, e.g. `sudo PORT=8080 SETUP_NGINX=no bash bootstrap.sh`.
    Cloudflare Tunnel in front of Nginx (the app expects
    `X-Forwarded-For` / `X-Forwarded-Proto`, which the proxy sets for you).
 
+### Public URL with Cloudflare Tunnel (private access)
+
+To reach the IDE at a real URL like `https://ide.pixelabs.in` **without opening
+any inbound ports** and **without exposing it to the world**:
+
+1. Create a tunnel: Cloudflare **Zero Trust -> Networks -> Tunnels -> Create a
+tunnel -> Cloudflared**, name it `mobile-py-ide`, and copy the install token.
+2. On the server, run the helper (installs `cloudflared`, starts it as a service):
+
+   ```bash
+   sudo bash deploy/cloudflare-tunnel.sh <TUNNEL_TOKEN>
+   ```
+
+3. In the tunnel, add a **Public Hostname**: `ide` / `pixelabs.in` ->
+   `HTTP` -> `localhost:3000`.
+4. Lock it to yourself: **Zero Trust -> Access -> Applications -> Add an
+   application** (Self-hosted, domain `ide.pixelabs.in`), policy
+   **Allow** where **Emails = you@pixelabs.in**.
+
+With a tunnel you can close inbound 80/443 entirely — `cloudflared` dials out,
+so the server never accepts a public connection. If you use a tunnel, install
+with `SETUP_NGINX=no` (the tunnel talks straight to `localhost:3000`).
+
 ### Hardening the runner
 
 For a shared or public server, set `RUN_AS_UID`/`RUN_AS_GID` so the runner drops
