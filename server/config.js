@@ -62,6 +62,11 @@ const config = {
   maxOutputBytes: num('MAX_OUTPUT_BYTES', 100 * 1024),
   pythonBin: process.env.PYTHON_BIN || 'python3',
 
+  // Interactive runs (streaming): killed after this much inactivity with no
+  // output and no input, and hard-killed at the absolute cap.
+  runIdleMs: num('RUN_IDLE_MS', 30000),
+  runMaxMs: num('RUN_MAX_MS', 120000),
+
   // Sandbox hardening
   // DISABLE_NETWORK needs either root or working user-namespaces (see README).
   disableNetwork: bool('DISABLE_NETWORK', false),
@@ -80,7 +85,12 @@ const config = {
   // Validation policy
   // STRICT_MODE=true -> only modules in allowedModules may be imported.
   strictMode: bool('STRICT_MODE', false),
-  blockedModules: [...BASE_BLOCKED, ...list('EXTRA_BLOCKED_MODULES', [])],
+  // UNBLOCK_MODULES removes names from the built-in blocked list (e.g. if you
+  // install pandas yourself on a big-enough server).
+  blockedModules: (() => {
+    const unblock = new Set(list('UNBLOCK_MODULES', []));
+    return [...BASE_BLOCKED, ...list('EXTRA_BLOCKED_MODULES', [])].filter((m) => !unblock.has(m));
+  })(),
   allowedModules: [...BASE_ALLOWED, ...list('EXTRA_ALLOWED_MODULES', [])],
 };
 

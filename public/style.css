@@ -1,4 +1,4 @@
-/* Mobile Py IDE — dark, mobile-first styling. */
+/* Mobile Py IDE — dark theme, mobile-first, with a desktop split layout. */
 
 :root {
   --bg: #0d1117;
@@ -72,6 +72,7 @@ body {
 }
 .run-btn:active { filter: brightness(0.9); }
 .run-btn:disabled { opacity: 0.5; }
+.run-btn.stopping { background: var(--danger); color: #fff; }
 .run-icon { font-size: 12px; }
 
 .ghost-btn {
@@ -112,7 +113,7 @@ main {
   min-height: 0;
   overflow: hidden;
 }
-.panel { display: none; height: 100%; }
+.panel { display: none; height: 100%; min-height: 0; }
 .panel.active { display: flex; flex-direction: column; }
 
 /* editor */
@@ -152,6 +153,73 @@ main {
 }
 .console-output .err { color: var(--danger); }
 .console-output .muted { color: var(--muted); }
+.console-output .echo { color: var(--accent); }
+
+/* input line */
+.console-input {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.console-input .prompt { color: var(--accent-2); font-family: var(--mono); font-weight: 700; padding-left: 4px; }
+.console-input input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 15px;
+  outline: none;
+}
+.console-input input:focus { border-color: var(--accent); }
+.console-input input:disabled { opacity: 0.5; }
+.console-input button {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+.console-input button:disabled { opacity: 0.4; }
+
+/* prefill */
+.prefill { flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--bg-elev); }
+.prefill summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  user-select: none;
+}
+.prefill[open] summary { color: var(--text); }
+.prefill .stdin-box {
+  display: block;
+  width: 100%;
+  height: 84px;
+  resize: vertical;
+  border: none;
+  border-top: 1px solid var(--border);
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 8px 12px;
+}
+.prefill-hint { padding: 4px 12px 8px; font-size: 11.5px; color: var(--muted); }
 
 .status {
   flex: 0 0 auto;
@@ -166,24 +234,7 @@ main {
 .status.success { color: var(--accent-2); }
 .status.error { color: var(--danger); }
 .status.timeout { color: var(--warning); }
-
-/* input panel */
-.input-label { display: block; padding: 10px 14px 6px; font-size: 13px; color: var(--muted); }
-.input-label code { color: var(--accent); }
-.stdin-box {
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  resize: none;
-  border: none;
-  outline: none;
-  background: #0d1117;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 15px;
-  line-height: 1.5;
-  padding: 10px 14px;
-}
+.status.running { color: var(--accent); }
 
 /* ---------- symbol toolbar ---------- */
 .symbolbar {
@@ -216,14 +267,25 @@ main {
 }
 .symbolbar button:active { background: var(--accent); color: #fff; }
 .symbolbar button.snip { font-size: 13px; }
-.symbolbar .divider {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 24px;
-  background: var(--border);
-  margin: 0 2px;
-}
+.symbolbar .divider { flex: 0 0 auto; width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
 
-/* keep iOS from zooming when focusing an input */
 textarea, input { font-size: 16px; }
-.editor-fallback, .stdin-box { font-size: 15px; }
+.editor-fallback, .stdin-box, .console-input input { font-size: 15px; }
+
+/* ---------- desktop: editor and console side by side ---------- */
+@media (min-width: 860px) {
+  .tabs { display: none; }
+
+  main { display: flex; flex-direction: row; }
+
+  .panel { display: flex; flex-direction: column; }
+
+  #editor { flex: 1.4 1 0; border-right: 1px solid var(--border); }
+  #console { flex: 1 1 0; }
+
+  .topbar { padding: 0 16px; }
+  .brand-text { font-size: 17px; }
+
+  .console-output { font-size: 14px; }
+  .prefill .stdin-box { height: 64px; }
+}

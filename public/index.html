@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0d1117" />
   <meta name="color-scheme" content="dark" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="Lightweight, sandboxed, mobile-optimized web Python IDE." />
+  <meta name="description" content="Lightweight, sandboxed, mobile- and desktop-friendly web Python IDE." />
   <title>Mobile Py IDE</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%8D%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -16,11 +16,11 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="logo">🐍</span><span>Mobile Py IDE</span></div>
+    <div class="brand"><span class="logo">🐍</span><span class="brand-text">Mobile Py IDE</span></div>
     <div class="actions">
       <button id="clearBtn" class="ghost-btn" type="button" title="Clear console">Clear</button>
       <button id="runBtn" class="run-btn" type="button">
-        <span class="run-icon">▶</span><span>Run</span>
+        <span class="run-icon">▶</span><span id="runLabel">Run</span>
       </button>
     </div>
   </header>
@@ -28,7 +28,6 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="editor" role="tab">Code</button>
     <button class="tab" data-tab="console" role="tab">Console</button>
-    <button class="tab" data-tab="input" role="tab">Input</button>
   </nav>
 
   <main>
@@ -41,21 +40,30 @@
 
     <section id="console" class="panel">
       <div id="output" class="console-output"><span class="muted">Press ▶ Run to execute your code.</span></div>
-      <div id="status" class="status"></div>
-    </section>
 
-    <section id="input" class="panel">
-      <label class="input-label" for="stdin">Standard input (sent to <code>input()</code>)</label>
-      <textarea id="stdin" class="stdin-box" spellcheck="false"
-        autocapitalize="off" autocomplete="off" autocorrect="off"
-        placeholder="Type values here, one per line…"></textarea>
+      <form id="inputForm" class="console-input" autocomplete="off">
+        <span class="prompt" aria-hidden="true">›</span>
+        <input id="inputLine" type="text" placeholder="Type input, then press Enter" disabled
+          autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <button id="sendBtn" type="submit" disabled>Send</button>
+      </form>
+
+      <details class="prefill">
+        <summary>Pre-fill input (optional)</summary>
+        <textarea id="stdin" class="stdin-box" spellcheck="false"
+          autocapitalize="off" autocomplete="off" autocorrect="off"
+          placeholder="One value per line…"></textarea>
+        <div class="prefill-hint">Sent to the program as soon as it starts. Handy when a program asks for several values.</div>
+      </details>
+
+      <div id="status" class="status"></div>
     </section>
   </main>
 
   <div class="symbolbar" id="symbolbar" aria-label="Symbol toolbar">
     <button type="button" data-key="tab" title="Indent">⇥ Tab</button>
     <button type="button" data-insert=":">:</button>
-    <button type="button" data-insert="(" data-back="0">(</button>
+    <button type="button" data-insert="(">(</button>
     <button type="button" data-insert=")">)</button>
     <button type="button" data-insert="[">[</button>
     <button type="button" data-insert="]">]</button>
@@ -75,6 +83,7 @@
     <span class="divider"></span>
     <button type="button" data-insert="print()" data-back="1" class="snip">print()</button>
     <button type="button" data-insert="input()" data-back="1" class="snip">input()</button>
+    <button type="button" data-insert="int(input())" class="snip">int(input())</button>
     <button type="button" data-insert="range()" data-back="1" class="snip">range()</button>
     <button type="button" data-insert="for i in range(10):&#10;    " class="snip">for</button>
     <button type="button" data-insert="if True:&#10;    " class="snip">if</button>

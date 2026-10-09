@@ -41,7 +41,7 @@ export DEBIAN_FRONTEND=noninteractive
 # --- 1. base packages ---------------------------------------------------
 log "Installing base packages"
 apt-get update -y
-apt-get install -y --no-install-recommends ca-certificates curl git python3
+apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-venv python3-pip
 
 # --- 2. Node.js ---------------------------------------------------------
 need_node=1
@@ -77,6 +77,17 @@ else
 fi
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+# --- 4b. virtual environment (this is where pip installs go) ------------
+VENV_PY="python3"
+if python3 -m venv "$APP_DIR/venv" >/dev/null 2>&1; then
+  log "Created virtual environment at $APP_DIR/venv"
+  "$APP_DIR/venv/bin/pip" install --upgrade pip >/dev/null 2>&1 || true
+  VENV_PY="$APP_DIR/venv/bin/python3"
+  chown -R "$APP_USER:$APP_USER" "$APP_DIR/venv"
+else
+  warn "Could not create a virtual environment; falling back to the system python3."
+fi
+
 # --- 5. env file --------------------------------------------------------
 if [ ! -f "$APP_DIR/.env" ]; then
   log "Writing $APP_DIR/.env"
@@ -88,6 +99,7 @@ MEMORY_LIMIT_MB=128
 MAX_CONCURRENT_RUNS=2
 MAX_QUEUE=8
 STRICT_MODE=false
+PYTHON_BIN=${VENV_PY}
 EOF
   chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 else

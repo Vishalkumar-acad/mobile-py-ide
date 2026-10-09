@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0d1117" />
+<title>Mobile Py IDE — Guide</title>
+<style>
+  :root {
+    --bg:#0d1117; --bg-elev:#161b22; --bg-elev-2:#1f2630; --border:#2b323d;
+    --text:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --accent-2:#3fb950;
+    --danger:#f85149; --warning:#d29922;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); line-height:1.65; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
+  header.hero { padding: 56px 0 28px; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing:-0.5px; }
+  .sub { color: var(--muted); font-size: 17px; margin: 0; }
+  .pill { display:inline-block; font-size:12px; font-family:var(--mono); color:var(--accent-2);
+          border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin-bottom:14px; }
+  nav.toc { display:flex; flex-wrap:wrap; gap:8px; margin: 22px 0 0; }
+  nav.toc a { font-size:13px; color:var(--muted); text-decoration:none; border:1px solid var(--border);
+              border-radius:8px; padding:5px 10px; background:var(--bg-elev); }
+  nav.toc a:hover { color:var(--text); border-color:var(--accent); }
+  h2 { font-size: 23px; margin: 44px 0 12px; padding-top: 8px; }
+  h3 { font-size: 17px; margin: 26px 0 8px; }
+  p, li { font-size: 16px; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--bg-elev-2);
+         padding: 1px 6px; border-radius: 5px; }
+  pre { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: 13.5px; line-height: 1.55; }
+  table { width:100%; border-collapse: collapse; margin: 14px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .4px; }
+  .card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 18px 0; }
+  .note { border-left: 3px solid var(--accent); }
+  .warn { border-left: 3px solid var(--warning); }
+  .bad  { border-left: 3px solid var(--danger); }
+  .ok   { border-left: 3px solid var(--accent-2); }
+  img.shot { width:100%; border:1px solid var(--border); border-radius:12px; margin: 12px 0 4px; }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 13px; text-align:center; }
+  kbd { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev-2);
+        border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 20px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="pill">🐍 Mobile Py IDE</span>
+  <h1>How to use your Python IDE</h1>
+  <p class="sub">A small, safe place to write and run Python from a phone or a desktop browser.</p>
+  <nav class="toc">
+    <a href="#start">Getting started</a>
+    <a href="#screen">The screen</a>
+    <a href="#input">Input &amp; output</a>
+    <a href="#libraries">Libraries</a>
+    <a href="#packages">Installing packages</a>
+    <a href="#blocked">What is blocked</a>
+    <a href="#fix">Troubleshooting</a>
+    <a href="#api">API</a>
+    <a href="#host">Self-hosting</a>
+  </nav>
+</header>
+
+<h2 id="start">Getting started</h2>
+<p>Open the IDE in your browser — on a phone it looks like this:</p>
+<figure>
+  <img class="shot" src="screenshot-mobile.png" alt="The IDE on a phone, running a program that asked for a name" />
+  <figcaption>A program that asked for input, answered live in the console.</figcaption>
+</figure>
+<p>Type some Python in the <strong>Code</strong> area, press <strong>▶ Run</strong>, and the output appears in the <strong>Console</strong>. That is the whole loop.</p>
+
+<h2 id="screen">The screen</h2>
+<table>
+  <tr><th>Element</th><th>What it does</th></tr>
+  <tr><td><strong>Code / Console</strong> tabs</td><td>Switch between writing code and seeing output. On a wide screen both are shown side by side and the tabs disappear.</td></tr>
+  <tr><td><strong>▶ Run</strong></td><td>Runs the code. While a program is running it turns into <strong>■ Stop</strong>.</td></tr>
+  <tr><td><strong>Clear</strong></td><td>Empties the console.</td></tr>
+  <tr><td><strong>Symbol bar</strong></td><td>The scrollable row at the bottom with <code>:</code> <code>(</code> <code>"</code> <code>_</code> and shortcuts like <code>print()</code>, <code>input()</code>, <code>for</code>, <code>if</code>. Tap to insert at the cursor — no keyboard switching needed.</td></tr>
+  <tr><td><strong>› input line</strong></td><td>Where you type answers to a running program (see below).</td></tr>
+  <tr><td><strong>Pre-fill input</strong></td><td>Optional: lines sent to the program the moment it starts.</td></tr>
+</table>
+<p>On a desktop it becomes a two-pane layout — editor on the left, console on the right:</p>
+<figure>
+  <img class="shot" src="screenshot-desktop.png" alt="The IDE on a desktop browser, editor left and console right" />
+  <figcaption>The same page on a desktop.</figcaption>
+</figure>
+<p>Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or <kbd>Cmd</kbd>+<kbd>Enter</kbd>) to run without reaching for the button. Your code is saved in the browser automatically, so it is still there when you come back.</p>
+
+<h2 id="input">Input &amp; output</h2>
+<p>This IDE has a <strong>live console</strong>. When your program calls <code>input()</code>, it prints its prompt, pauses, and waits — then you type into the <strong>›</strong> line at the bottom of the console and press <kbd>Enter</kbd>. The program continues. You can do this as many times as it asks.</p>
+<pre><code>name = input("What is your name? ")
+print("Hello,", name, "!")</code></pre>
+<p>Run that, type a name in the console input line, press Enter — and it answers. The typed line is echoed in blue so the transcript reads naturally.</p>
+<div class="card ok">
+  <strong>Pre-filling instead.</strong> If a program asks for several values in a row and you already know them, open <em>Pre-fill input</em> and put one value per line. Those lines are delivered as soon as the run starts. Anything beyond them you can still type live.
+</div>
+<p>If you never provide input, a program that reads it will stop with <code>EOFError</code> — that just means "no input was given".</p>
+<p>A run is stopped automatically if it goes quiet: after about 30 seconds with no output and no input, and at a hard cap of 2 minutes. You can also press <strong>■ Stop</strong> yourself.</p>
+
+<h2 id="libraries">Libraries</h2>
+<p>These are available out of the box, no installation needed:</p>
+<table>
+  <tr><th>Category</th><th>Modules</th></tr>
+  <tr><td>Everyday</td><td><code>math</code>, <code>cmath</code>, <code>random</code>, <code>statistics</code>, <code>decimal</code>, <code>fractions</code>, <code>json</code>, <code>csv</code>, <code>re</code>, <code>string</code>, <code>textwrap</code>, <code>pprint</code></td></tr>
+  <tr><td>Date &amp; time</td><td><code>datetime</code>, <code>time</code>, <code>calendar</code>, <code>zoneinfo</code></td></tr>
+  <tr><td>Functional</td><td><code>itertools</code>, <code>functools</code>, <code>operator</code>, <code>collections</code>, <code>heapq</code>, <code>bisect</code>, <code>copy</code></td></tr>
+  <tr><td>Types &amp; data</td><td><code>dataclasses</code>, <code>enum</code>, <code>typing</code>, <code>array</code>, <code>struct</code>, <code>uuid</code>, <code>base64</code>, <code>hashlib</code>, <code>secrets</code></td></tr>
+  <tr><td>Handy extras</td><td><code>sys</code>, <code>io</code>, <code>contextlib</code>, <code>traceback</code>, <code>unicodedata</code></td></tr>
+  <tr><td>Third-party (pre-installed)</td><td><code>numpy</code>, <code>requests</code></td></tr>
+</table>
+
+<h2 id="packages">Installing packages</h2>
+<p>The runner uses its own virtual environment on the server, so installing a package there makes it importable in the IDE. On the server, run:</p>
+<pre><code>sudo bash deploy/add-packages.sh rich tabulate</code></pre>
+<p>Then <code>import rich</code> works in your programs. That is how "pip install" works here — one command on the server, available to every run afterwards.</p>
+<div class="card note">
+  <strong>Why not pip from the IDE itself?</strong> Letting a web page install arbitrary code onto the server is a big security hole, and on a small server a heavy package can fill the disk or the memory. Installing deliberately, from a shell you control, keeps the box safe.
+</div>
+<p>If you install something that the validator blocks by name, unblock it in <code>.env</code>:</p>
+<pre><code>UNBLOCK_MODULES=pandas</code></pre>
+
+<h2 id="blocked">What is blocked, and why</h2>
+<p>Before anything runs, the server checks the code and refuses a few things:</p>
+<ul>
+  <li><strong>Heavy libraries</strong> — <code>torch</code>, <code>tensorflow</code>, <code>keras</code>, <code>transformers</code>, <code>cv2</code>, <code>sklearn</code>, <code>scipy</code>, <code>pandas</code>, <code>matplotlib</code>. They would not fit the server's memory.</li>
+  <li><strong>System access</strong> — <code>os</code>, <code>subprocess</code>, <code>ctypes</code>, <code>multiprocessing</code>, <code>pty</code>.</li>
+  <li><strong>Network</strong> — <code>socket</code>, <code>ftplib</code>, <code>smtplib</code>, <code>paramiko</code>.</li>
+  <li><strong>Escapes</strong> — <code>eval</code>, <code>exec</code>, <code>open</code>, <code>__import__</code>, and attributes like <code>__class__</code>.</li>
+</ul>
+<p>Each program runs in its own temporary folder, as a limited subprocess with a memory cap, and the folder is deleted the moment it finishes. A file that merely <em>mentions</em> a blocked word inside a string or comment is fine — the checker reads the real code.</p>
+
+<h2 id="fix">Troubleshooting</h2>
+<table>
+  <tr><th>What you see</th><th>What it means</th></tr>
+  <tr><td><code>EOFError: EOF when reading a line</code></td><td>The program asked for input but none arrived. Type into the <strong>›</strong> line while it runs, or pre-fill the input box.</td></tr>
+  <tr><td><code>ValueError: could not convert string to float</code></td><td>The value you gave was not a number. If you pre-filled the box, check you did not paste code into it by mistake.</td></tr>
+  <tr><td>Status: <em>Stopped: no activity</em></td><td>The program produced nothing for ~30 seconds, so it was stopped — usually an endless loop.</td></tr>
+  <tr><td>Status: <em>Time limit reached</em></td><td>The run hit the 2-minute cap.</td></tr>
+  <tr><td><code>Error: importing 'os' is not allowed</code></td><td>The checker blocked a module. See the list above.</td></tr>
+  <tr><td><em>Server is busy…</em></td><td>Two programs were already running. Wait a moment and press Run again.</td></tr>
+</table>
+
+<h2 id="api">API</h2>
+<table>
+  <tr><th>Method &amp; path</th><th>Purpose</th></tr>
+  <tr><td><code>GET /api/health</code></td><td>Service status and limits.</td></tr>
+  <tr><td><code>POST /api/run</code></td><td>One-shot: send <code>{code, stdin}</code>, get the full result as JSON.</td></tr>
+  <tr><td><code>POST /api/runs</code></td><td>Start an interactive run; returns <code>{runId}</code>.</td></tr>
+  <tr><td><code>GET /api/runs/:id/events</code></td><td>Server-Sent Events stream of output and the final exit.</td></tr>
+  <tr><td><code>POST /api/runs/:id/input</code></td><td>Send <code>{data}</code> to the running program.</td></tr>
+  <tr><td><code>POST /api/runs/:id/kill</code></td><td>Stop the run.</td></tr>
+</table>
+<pre><code>curl -s localhost:3000/api/run \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"import math\nprint(math.pi)"}'</code></pre>
+
+<h2 id="host">Self-hosting</h2>
+<p>It is a small Node.js server (no npm dependencies) that shells out to Python in a sandbox. On an Ubuntu/Debian box:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o bootstrap.sh
+sudo bash bootstrap.sh</code></pre>
+<p>Put it behind a Cloudflare Tunnel with a Cloudflare Access policy and only you can reach it. Pushes to <code>main</code> deploy themselves through GitHub Actions.</p>
+
+<footer>
+  <p>Mobile Py IDE — MIT licensed. Source: <a href="https://github.com/Vishalkumar-acad/mobile-py-ide">github.com/Vishalkumar-acad/mobile-py-ide</a></p>
+</footer>
+
+</div>
+</body>
+</html>

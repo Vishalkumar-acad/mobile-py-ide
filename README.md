@@ -1,43 +1,45 @@
 # Mobile Py IDE 🐍
 
-A lightweight, sandboxed, **mobile-optimized** web Python IDE. Built for one
-person to run small Python programs from a phone browser — no heavy desktop
-IDE, no bloated web app, just a fast editor and a safe place to press **Run**.
+A lightweight, sandboxed, **mobile- and desktop-friendly** web Python IDE.
+Write Python in a browser, press **Run**, and watch it work — including a
+**live console** where `input()` pauses and waits for you to type, just like a
+real terminal.
 
-- **Zero npm dependencies** — the backend uses only Node's built-in modules.
-  Nothing to `npm install`, fewer things to break.
-- **Tiny frontend** — one HTML page, one CSS file, one JS file. CodeMirror 6 is
-  loaded from a CDN, with a plain-textarea fallback if the CDN is unreachable.
-- **Mobile-first UI** — dark theme, large touch targets, Code/Console/Input
-  tabs, and a scrollable symbol bar so you can type `:`, `(`, `"`, `_`, `print()`
-  and `for` without fighting the phone keyboard.
-- **Sandboxed runner** — each program runs in its own temp file, as a resource
-  limited subprocess, with a wall-clock timeout, a memory cap, a minimal
-  environment and no file/network access.
+- **Live console.** Programs stream their output as they run and can ask for
+  input mid-run. No more `EOFError` because you forgot to fill a box first.
+- **Works on phone and desktop.** One page: tabs and a symbol bar on a phone,
+  a two-pane editor/console layout on a wide screen.
+- **Zero npm dependencies.** The backend uses only Node's built-in modules —
+  nothing to `npm install`, fewer things to break.
+- **Sandboxed runner.** Every program runs in its own temp folder, as a
+  resource-limited subprocess, with CPU/memory caps, an idle timeout and no
+  file or network access.
+
+📖 **[Read the guide](https://vishalkumar-acad.github.io/mobile-py-ide/)** (GitHub Pages)
 
 ---
 
 ## Architecture
 
 ```
-[ phone browser ]
-      │  code + stdin (JSON)
+[ phone / desktop browser ]
+      │  code, then live stdin ⇄ SSE output
       ▼
-[ Cloudflare Tunnel / Zero Trust ]   (optional, for remote access + TLS)
+[ Cloudflare Tunnel + Access ]   (optional: private access, no open ports)
       │
       ▼
-[ Nginx reverse proxy ]              (optional)
+[ Nginx reverse proxy ]          (optional; buffering off for SSE)
       │
       ▼
-[ Node.js HTTP server ]  server/app.js
-      │   ├─ validator.js   pre-execution checks (blocked imports/calls)
-      │   ├─ executor.js    sandboxed subprocess + limits
+[ Node.js HTTP server ]  server/app.js   (zero dependencies)
+      │   ├─ validator.js   pre-execution checks
+      │   ├─ runs.js        streaming run engine (spawn, limits, stdin, SSE)
       │   └─ /tmp/…         ephemeral .py file, deleted after each run
       ▼
-[ python3 -I -B -q  under ulimit ]
+[ python3 -I -B -q -u  under ulimit ]
       │
       ▼
-[ stdout / stderr ] → JSON → console on the phone
+[ stdout / stderr ] → streamed to the console on the page
 ```
 
 ## Project layout
@@ -47,38 +49,54 @@ mobile-py-ide/
 ├── package.json
 ├── .env.example
 ├── server/
-│   ├── app.js         # zero-dep HTTP server + static file serving + API
+│   ├── app.js         # zero-dep HTTP server, static files, API, SSE
 │   ├── config.js      # all tunables (env-driven)
 │   ├── validator.js   # blocked imports, blocked calls, allow-list mode
-│   └── executor.js    # temp file, ulimit, timeout, output caps, cleanup
+│   ├── runs.js        # interactive streaming run engine
+│   └── executor.js    # one-shot wrapper around runs.js
 ├── public/
-│   ├── index.html     # mobile tab layout
-│   ├── style.css      # dark, mobile-first styles
-│   └── main.js        # CodeMirror + API calls + symbol bar
+│   ├── index.html     # responsive layout (mobile tabs + desktop split)
+│   ├── style.css      # dark theme, mobile-first, desktop breakpoint
+│   └── main.js        # CodeMirror + streaming client + symbol bar
+├── docs/              # the GitHub Pages user guide
 ├── deploy/
-│   ├── nginx.conf     # example reverse proxy
-│   └── mobile-py-ide.service  # systemd unit
-└── test/run-tests.js  # dependency-free test suite
+│   ├── bootstrap.sh   # one-command install (Node, venv, systemd, swap, nginx)
+│   ├── add-packages.sh# pip install extra libraries for the runner
+│   ├── cloudflare-tunnel.sh
+│   ├── nginx.conf
+│   └── mobile-py-ide.service
+├── .github/workflows/
+│   ├── deploy.yml     # auto-deploy on push (SSH secrets)
+│   └── pages.yml      # publish docs/ to GitHub Pages
+└── test/run-tests.js  # dependency-free test suite (22 tests)
 ```
 
 ---
 
 ## Quick start (local)
 
-Requires **Node.js 20+** and **Python 3.10+** on the server.
+Requires **Node.js 20+** and **Python 3.10+**.
 
 ```bash
-git clone https://github.com/<you>/mobile-py-ide.git
+git clone https://github.com/Vishalkumar-acad/mobile-py-ide.git
 cd mobile-py-ide
-npm start
-# -> Mobile Py IDE running at http://127.0.0.1:3000
+npm start          # -> http://127.0.0.1:3000
+npm test           # 22 tests
 ```
 
-Open `http://127.0.0.1:3000`. Run the tests with:
+## Using it
 
-```bash
-npm test
-```
+- **Code** tab — write Python. The symbol bar inserts `:`, `(`, `"`, `_` and
+  snippets like `print()`, `input()`, `for`.
+- **Console** tab — output appears live. When the program calls `input()`, its
+  prompt shows and the **›** line at the bottom becomes active: type a line,
+  press Enter, and it continues.
+- **Pre-fill input** — optional; lines you want sent the moment the run starts.
+- **Run / Stop** — the same button; it becomes Stop while a program runs.
+- <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>Enter</kbd> runs without the button.
+
+On a screen wider than 860px the tabs disappear and the editor and console sit
+side by side.
 
 ## Configuration
 
@@ -88,114 +106,82 @@ Copy `.env.example` to `.env` and edit. Highlights:
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP port |
 | `HOST` | `127.0.0.1` | Bind address (keep loopback behind a proxy) |
-| `TIMEOUT_MS` | `5000` | Wall-clock limit per run |
+| `TIMEOUT_MS` | `5000` | Cap for the one-shot `/api/run` |
+| `RUN_IDLE_MS` | `30000` | Stop an interactive run after this much inactivity |
+| `RUN_MAX_MS` | `120000` | Absolute cap for an interactive run |
 | `MEMORY_LIMIT_MB` | `128` | Virtual-memory cap (`ulimit -v`) |
+| `MAX_CONCURRENT_RUNS` | `2` | Programs running at once (memory guard) |
+| `MAX_QUEUE` | `8` | Runs allowed to wait before a 429 |
 | `STRICT_MODE` | `false` | `true` = only allow-listed modules may be imported |
+| `UNBLOCK_MODULES` | – | Remove names from the built-in blocked list |
 | `DISABLE_NETWORK` | `false` | Wrap the runner in `unshare -n` (needs root or userns) |
 | `RUN_AS_UID` / `RUN_AS_GID` | – | Run the runner as a low-privilege user |
-| `RATE_MAX` | `60` | Max runs per IP per `RATE_WINDOW_MS` |
-| `MAX_CONCURRENT_RUNS` | `2` | Programs executing at the same time (memory guard) |
-| `MAX_QUEUE` | `8` | Runs allowed to wait for a free slot before a 429 |
 
-> **Note on the memory cap.** The sandbox default is 128 MB. Small scripts and
-> `math`/`random`/`json` run comfortably, but `numpy` can reserve a lot of
-> virtual memory and may need a higher `MEMORY_LIMIT_MB`. Raise it if a light
-> library fails to import; the cap exists to stop runaway loops, not to be tiny.
+> **Memory.** The sandbox default is 128 MB per program. Small scripts and
+> `math`/`random`/`json` are comfortable; `numpy` may need a higher
+> `MEMORY_LIMIT_MB`. The cap exists to stop runaway loops, not to be tiny.
+
+## Installing extra libraries
+
+The runner uses a virtual environment created by the bootstrap, so pip
+installs land somewhere isolated and safe:
+
+```bash
+sudo bash deploy/add-packages.sh rich tabulate
+# then: import rich
+```
+
+The IDE does not run `pip` from the browser on purpose — letting a web page
+install arbitrary code onto the server is a security hole, and a heavy package
+can exhaust a small box. Install deliberately, from a shell.
 
 ## Server sizing
 
-This IDE is deliberately small. A **2 GB RAM / 5 GB disk** VPS is more than
-enough for personal use — the app is ~50 KB of code, Node idles at ~60–80 MB,
-and each run is capped at `MEMORY_LIMIT_MB`. There is no `node_modules` (the
-backend has zero dependencies) and the editor is loaded from a CDN, so nothing
-heavy is stored on disk.
+A **2 GB RAM / 5 GB disk** VPS is more than enough: the app is ~50 KB of code,
+Node idles at ~60–80 MB, and each run is capped at `MEMORY_LIMIT_MB`. There is
+no `node_modules` and the editor loads from a CDN, so little is stored on disk.
+Add 1–2 GB of swap so a spike slows the box instead of triggering the OOM
+killer:
 
-- **Concurrency.** `MAX_CONCURRENT_RUNS` (default `2`) keeps a small server
-  safe: at most two programs execute at once, the rest wait in a short queue.
-  On 2 GB you can raise it to 3–4 if you like, but 2 is a sensible default.
-- **Swap.** Add 1–2 GB of swap so a memory spike slows the box down instead of
-  triggering the OOM killer:
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
 
-  ```bash
-  sudo fallocate -l 2G /swapfile
-  sudo chmod 600 /swapfile
-  sudo mkswap /swapfile
-  sudo swapon /swapfile
-  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-  ```
+---
 
 ## Deploying on a VPS
 
 ### One command (Ubuntu / Debian)
 
-On a fresh Ubuntu/Debian server, a bootstrap script does everything: installs
-Node 20, creates a low-privilege user, clones the app to `/opt/mobile-py-ide`,
-installs a hardened systemd service, creates swap if the box has none, and sets
-up nginx on port 80.
-
 ```bash
-# review it first, then run
 curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o bootstrap.sh
 less bootstrap.sh
 sudo bash bootstrap.sh
 ```
 
-Then open `http://<your-server-ip>/` on your phone. Override settings with env
-vars, e.g. `sudo PORT=8080 SETUP_NGINX=no bash bootstrap.sh`.
-
-### Manually
-
-1. **Install** Node 20+ and Python 3.10+ on the server.
-2. **Copy** the project to e.g. `/opt/mobile-py-ide` and create a `mobilepy`
-   user to own it.
-3. **Service** — install the systemd unit from `deploy/mobile-py-ide.service`
-   (edit `WorkingDirectory` / `User` first), then
-   `sudo systemctl enable --now mobile-py-ide`.
-4. **Reverse proxy** — install `deploy/nginx.conf`, set your `server_name`, and
-   reload Nginx. Keep the app bound to `127.0.0.1`.
-5. **Remote access** — for phone access without opening ports, put a
-   Cloudflare Tunnel in front of Nginx (the app expects
-   `X-Forwarded-For` / `X-Forwarded-Proto`, which the proxy sets for you).
+Installs Node 20, creates a low-privilege user, clones to `/opt/mobile-py-ide`,
+builds a Python venv, installs a hardened systemd service, adds swap if the box
+has none, and sets up nginx. Override with env vars, e.g.
+`sudo SETUP_NGINX=no bash bootstrap.sh`.
 
 ### Public URL with Cloudflare Tunnel (private access)
 
-To reach the IDE at a real URL like `https://ide.pixelabs.in` **without opening
-any inbound ports** and **without exposing it to the world**:
+1. Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared, name it
+   `mobile-py-ide`, copy the install token.
+2. On the server: `sudo bash deploy/cloudflare-tunnel.sh <TUNNEL_TOKEN>`
+3. Add a Public Hostname: `ide` / `pixelabs.in` → `HTTP` → `localhost:3000`.
+4. Lock it down: Zero Trust → Access → Applications → Add a self-hosted app for
+   `ide.pixelabs.in`, policy **Allow** where **Emails = you@pixelabs.in**.
 
-1. Create a tunnel: Cloudflare **Zero Trust -> Networks -> Tunnels -> Create a
-tunnel -> Cloudflared**, name it `mobile-py-ide`, and copy the install token.
-2. On the server, run the helper (installs `cloudflared`, starts it as a service):
-
-   ```bash
-   sudo bash deploy/cloudflare-tunnel.sh <TUNNEL_TOKEN>
-   ```
-
-3. In the tunnel, add a **Public Hostname**: `ide` / `pixelabs.in` ->
-   `HTTP` -> `localhost:3000`.
-4. Lock it to yourself: **Zero Trust -> Access -> Applications -> Add an
-   application** (Self-hosted, domain `ide.pixelabs.in`), policy
-   **Allow** where **Emails = you@pixelabs.in**.
-
-With a tunnel you can close inbound 80/443 entirely — `cloudflared` dials out,
-so the server never accepts a public connection. If you use a tunnel, install
-with `SETUP_NGINX=no` (the tunnel talks straight to `localhost:3000`).
-
-### Hardening the runner
-
-For a shared or public server, set `RUN_AS_UID`/`RUN_AS_GID` so the runner drops
-privileges, and try `DISABLE_NETWORK=true`. Network isolation uses
-`unshare -n`, which needs either root or enabled user-namespaces
-(`sysctl kernel.unprivileged_userns_clone=1` on some distros) — verify it works
-on your host before relying on it.
-
----
+With a tunnel you can close inbound 80/443 entirely — `cloudflared` dials out.
+Install with `SETUP_NGINX=no` when using a tunnel.
 
 ## Auto-deploy with GitHub Actions
 
-After the app is installed once on the server, `.github/workflows/deploy.yml`
-updates it automatically on every push to `main` (and on demand from the
-Actions tab). Add these **repository secrets**
-(Settings -> Secrets and variables -> Actions):
+`.github/workflows/deploy.yml` updates the app on every push to `main`. Add
+these repository secrets (Settings → Secrets and variables → Actions):
 
 | Secret | Value |
 | --- | --- |
@@ -203,29 +189,30 @@ Actions tab). Add these **repository secrets**
 | `SSH_USER` | `ubuntu` (or your login user) |
 | `SSH_PRIVATE_KEY` | the full private key, including the `BEGIN`/`END` lines |
 
-Optional: `SSH_PORT` (22), `APP_DIR` (`/opt/mobile-py-ide`),
-`HEALTH_URL` (`http://127.0.0.1:3000/api/health`).
+Optional: `SSH_PORT`, `APP_DIR`, `HEALTH_URL`. If the secrets are absent the
+workflow skips quietly.
 
-The job simply SSHs in, runs `git fetch` + `git reset --hard origin/main` in
-`APP_DIR`, restarts the service, and waits for the health check. If the SSH
-secrets are not set, it skips quietly instead of failing.
-
-**Use a dedicated deploy key, not your main one.** On the server:
+**Use a dedicated deploy key, not your main one:**
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/deploy_key -N "" -C "github-actions"
 cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
 ```
 
-Put the **private** key (`~/.ssh/deploy_key`) into the `SSH_PRIVATE_KEY`
-secret, and never paste a private key into a chat, issue, or commit.
+Never paste a private key into a chat, an issue, or a commit.
+
+## The guide site
+
+`docs/` is a self-contained user guide published to GitHub Pages by
+`.github/workflows/pages.yml`. Enable it once in **Settings → Pages → Build and
+deployment → Source: GitHub Actions**.
 
 ---
 
 ## What the validator blocks
 
-Before any code runs, `validator.js` strips strings and comments (so text that
-merely *looks* like code can't fool it) and then refuses:
+Before anything runs, `validator.js` strips strings and comments (so text that
+merely *looks* like code can't fool it) and refuses:
 
 - **Heavy / ML libraries:** `torch`, `tensorflow`, `keras`, `transformers`,
   `jax`, `cv2`, `sklearn`, `scipy`, `pandas`, `matplotlib`, …
@@ -237,26 +224,20 @@ merely *looks* like code can't fool it) and then refuses:
 - **Sandbox-escape attributes:** `__subclasses__`, `__globals__`,
   `__builtins__`, `__class__`, `__code__`, …
 
-Set `STRICT_MODE=true` to flip to an **allow-list** instead — only built-in
-safe modules plus whatever you add via `EXTRA_ALLOWED_MODULES` may be imported.
-
-Extend either list without touching code:
-
-```bash
-EXTRA_BLOCKED_MODULES=pillow,imageio
-EXTRA_ALLOWED_MODULES=sympy
-```
-
----
+`STRICT_MODE=true` flips to an **allow-list** instead. Extend either list with
+`EXTRA_BLOCKED_MODULES` / `EXTRA_ALLOWED_MODULES`, or remove a built-in block
+with `UNBLOCK_MODULES`.
 
 ## API
 
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
-| `GET` | `/api/health` | – | `{ ok, timeout_ms, memory_limit_mb, strict_mode }` |
-| `POST` | `/api/run` | `{ "code": "...", "stdin": "..." }` | execution result |
-
-Example:
+| `GET` | `/api/health` | – | status and limits |
+| `POST` | `/api/run` | `{ code, stdin }` | one-shot result (JSON) |
+| `POST` | `/api/runs` | `{ code, stdin? }` | `{ runId }` |
+| `GET` | `/api/runs/:id/events` | – | Server-Sent Events stream |
+| `POST` | `/api/runs/:id/input` | `{ data }` | `{ ok }` |
+| `POST` | `/api/runs/:id/kill` | – | `{ ok }` |
 
 ```bash
 curl -s localhost:3000/api/run \
@@ -264,35 +245,15 @@ curl -s localhost:3000/api/run \
   -d '{"code":"import math\nprint(math.pi)"}'
 ```
 
-```json
-{
-  "status": "success",
-  "stdout": "3.141592653589793\n",
-  "stderr": "",
-  "output": "3.141592653589793\n",
-  "exit_code": 0,
-  "execution_time": "0.06s",
-  "execution_time_ms": 60,
-  "truncated": false
-}
-```
-
-`status` is one of `success`, `error`, `timeout`, or `rejected` (blocked by the
-validator).
-
----
-
 ## Notes & limitations
 
 - This is a personal tool, not a hardened multi-tenant service. The validator
-  and resource limits raise the bar a lot, but if you ever expose it publicly,
-  also run the runner as a dedicated low-privilege user and consider a
-  container/VM per execution.
-- Because `os` and file access are blocked, programs can't read or write files;
-  use `input()` (fed by the **Input** tab) for data.
-- CodeMirror is pulled from `esm.sh`; if you want a fully offline IDE, download
-  the CodeMirror bundle and serve it locally, or just let the textarea fallback
-  take over.
+  and resource limits raise the bar a lot; if you ever expose it publicly, also
+  run the runner as a dedicated low-privilege user and consider a container or
+  VM per execution.
+- `os` and file access are blocked, so programs can't read or write files.
+- CodeMirror is pulled from `esm.sh`; if you want a fully offline IDE, vendor it
+  locally, or let the plain-textarea fallback take over.
 
 ## License
 
