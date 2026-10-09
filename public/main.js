@@ -363,6 +363,22 @@ async function stopRun() {
   try { await fetch(`/api/runs/${runId}/kill`, { method: 'POST' }); } catch { /* ignore */ }
 }
 
+// Drop any live session. Switching mode must never leave the old session
+// quietly receiving keystrokes — that is how a Terminal session ends up
+// looking like a REPL (or the other way round).
+function resetRun() {
+  if (runId) {
+    try { fetch(`/api/runs/${runId}/kill`, { method: 'POST' }); } catch { /* ignore */ }
+  }
+  if (es) { try { es.close(); } catch { /* ignore */ } es = null; }
+  if (termWs) { try { termWs.close(); } catch { /* ignore */ } termWs = null; }
+  runId = null;
+  termRunId = null;
+  receivedEvents = false;
+  setRunning(false);
+  setStatus('', '');
+}
+
 // Fallback for browsers without EventSource: one-shot run.
 async function startRunLegacy(code, prefill) {
   try {
@@ -460,8 +476,8 @@ function setMode(next) {
   codeTab.hidden = next !== 'script';
   switchTab('console');
   if (next === 'script' && usingCM) setTimeout(() => cmView.requestMeasure(), 0);
+  resetRun();
   clearOutput();
-  teardownTerminal();
   const hint = next === 'script' ? 'Press ▶ Run to execute your code.'
     : next === 'repl' ? 'Press ▶ Run to start a Python REPL, then type below.'
       : 'Press ▶ Run to open a terminal, then type commands below.';
