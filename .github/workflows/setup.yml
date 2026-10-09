@@ -43,4 +43,4 @@ jobs:
               -o StrictHostKeyChecking=accept-new \
               -o ConnectTimeout=15 \
               "$SSH_USER@$SSH_HOST" \
-              'curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o /tmp/bootstrap.sh && sudo bash /tmp/bootstrap.sh'
+              'set -e; sudo git config --global --add safe.directory /opt/mobile-py-ide; sudo git -C /opt/mobile-py-ide fetch --depth 1 origin main; sudo git -C /opt/mobile-py-ide reset --hard origin/main; sudo bash /opt/mobile-py-ide/deploy/bootstrap.sh'
