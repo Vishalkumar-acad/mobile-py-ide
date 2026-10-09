@@ -10,6 +10,7 @@ import { REPL_SOURCE } from '../server/modes.js';
 import { isAllowed } from '../server/packages.js';
 import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
 import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
+import config from '../server/config.js';
 
 const BASE = spaceDir('f'.repeat(32));
 
@@ -264,6 +265,34 @@ await checkAsync('the sweeper removes an idle space but keeps a fresh one', asyn
   assert.equal(await fs.stat(idle).then(() => true).catch(() => false), false);
   assert.equal(await fs.stat(fresh).then(() => true).catch(() => false), true);
   await fs.rm(fresh, { recursive: true, force: true });
+});
+
+// The desktop Terminal and REPL run under a pty. Which program the pty runs
+// comes from ptyCmd, and it is easy to wire that through only half way — a
+// bug that looks exactly like "my REPL opened a shell" from the outside.
+async function ptyBanner(ptyCmd) {
+  const run = await createRun('', {
+    kind: 'pty', ptyCmd, idleMs: 6000, maxMs: 25000, memoryMb: 512, cols: 100, rows: 30,
+  });
+  let out = '';
+  run.subscribe((e) => {
+    if (e.type === 'output' && e.raw) out += Buffer.from(e.b64, 'base64').toString('utf8');
+  });
+  await new Promise((r) => setTimeout(r, 1500));
+  run.kill();
+  await run.done;
+  return out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '');
+}
+
+await checkAsync('a pty REPL runs Python (a >>> prompt, not a shell $)', async () => {
+  const clean = await ptyBanner(`${JSON.stringify(config.pythonBin)} -i -q`);
+  assert.match(clean, />>>/, 'expected the Python >>> prompt');
+  assert.doesNotMatch(clean, /\$\s/, 'expected no shell prompt');
+});
+
+await checkAsync('a pty terminal runs a shell (a $ prompt)', async () => {
+  const clean = await ptyBanner('bash --norc -i');
+  assert.match(clean, /\$\s/, 'expected a shell prompt');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

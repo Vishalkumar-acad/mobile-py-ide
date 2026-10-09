@@ -250,7 +250,7 @@ export async function createRun(code, opts = {}) {
 
   const argv = kind === 'bash'
     ? ['-c', buildCommand({ kind, memoryMb, maxMs })]
-    : ['-c', buildCommand({ kind, memoryMb, maxMs, filePath: file }), 'mobi-py', file];
+    : ['-c', buildCommand({ kind, memoryMb, maxMs, filePath: file, ptyCmd }), 'mobi-py', file];
 
   try {
     run.child = spawn('bash', argv, {
