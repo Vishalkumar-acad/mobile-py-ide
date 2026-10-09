@@ -1,0 +1,81 @@
+name: Deploy to VPS
+
+# Updates the running app after a push to main (or on demand from the Actions tab).
+#
+# Configure these repository secrets first —
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#
+#   SSH_HOST         e.g. 13.205.171.68
+#   SSH_USER         e.g. ubuntu
+#   SSH_PRIVATE_KEY  the full private key (deploy key), including the
+#                    -----BEGIN ... KEY----- and -----END ... KEY----- lines
+#
+# Optional secrets (defaults shown):
+#   SSH_PORT         22
+#   APP_DIR          /opt/mobile-py-ide
+#   HEALTH_URL       http://127.0.0.1:3000/api/health
+#
+# This workflow only updates an app that is ALREADY installed. Run
+# deploy/bootstrap.sh once on the server first; after that, pushes to main
+# deploy themselves.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      APP_DIR: ${{ secrets.APP_DIR || '/opt/mobile-py-ide' }}
+      HEALTH_URL: ${{ secrets.HEALTH_URL || 'http://127.0.0.1:3000/api/health' }}
+
+    steps:
+      - name: Skip — SSH secrets not configured
+        if: env.SSH_HOST == ''
+        run: echo "SSH_HOST is not set. Add the SSH_* repository secrets to enable auto-deploy."
+
+      - name: Deploy over SSH
+        if: env.SSH_HOST != ''
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              "APP_DIR='$APP_DIR' HEALTH_URL='$HEALTH_URL' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          echo "==> Updating code in $APP_DIR"
+          sudo -u mobilepy git -C "$APP_DIR" fetch --depth 1 origin main
+          sudo -u mobilepy git -C "$APP_DIR" reset --hard origin/main
+
+          echo "==> Restarting service"
+          sudo systemctl restart mobile-py-ide
+
+          echo "==> Health check"
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo
+              echo "==> Deploy OK"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Health check failed" >&2
+          sudo journalctl -u mobile-py-ide -n 30 --no-pager >&2 || true
+          exit 1
+          REMOTE

@@ -167,6 +167,38 @@ on your host before relying on it.
 
 ---
 
+## Auto-deploy with GitHub Actions
+
+After the app is installed once on the server, `.github/workflows/deploy.yml`
+updates it automatically on every push to `main` (and on demand from the
+Actions tab). Add these **repository secrets**
+(Settings -> Secrets and variables -> Actions):
+
+| Secret | Value |
+| --- | --- |
+| `SSH_HOST` | server IP or hostname |
+| `SSH_USER` | `ubuntu` (or your login user) |
+| `SSH_PRIVATE_KEY` | the full private key, including the `BEGIN`/`END` lines |
+
+Optional: `SSH_PORT` (22), `APP_DIR` (`/opt/mobile-py-ide`),
+`HEALTH_URL` (`http://127.0.0.1:3000/api/health`).
+
+The job simply SSHs in, runs `git fetch` + `git reset --hard origin/main` in
+`APP_DIR`, restarts the service, and waits for the health check. If the SSH
+secrets are not set, it skips quietly instead of failing.
+
+**Use a dedicated deploy key, not your main one.** On the server:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/deploy_key -N "" -C "github-actions"
+cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys
+```
+
+Put the **private** key (`~/.ssh/deploy_key`) into the `SSH_PRIVATE_KEY`
+secret, and never paste a private key into a chat, issue, or commit.
+
+---
+
 ## What the validator blocks
 
 Before any code runs, `validator.js` strips strings and comments (so text that
