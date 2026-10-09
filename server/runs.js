@@ -13,6 +13,10 @@ import config from './config.js';
 
 const runs = new Map();
 const LOG_CAP = 800;
+// Finished runs are kept briefly (see finalize) so a late subscriber still gets
+// their output; this bounds how many are held.
+const MAX_RETAINED = 100;
+const finishedOrder = [];
 
 export function getRun(id) {
   return runs.get(id);
@@ -139,7 +143,19 @@ export async function createRun(code, opts = {}) {
       try { fn(evt); } catch { /* ignore */ }
     }
     listeners.clear();
-    runs.delete(run.id);
+    // A fast program can finish before the browser has attached to /events.
+    // Keep the run (and its replayed log) around for a while so the late
+    // subscriber gets the output instead of a 404.
+    finishedOrder.push(run.id);
+    while (finishedOrder.length > MAX_RETAINED) {
+      const old = finishedOrder.shift();
+      if (old !== run.id) runs.delete(old);
+    }
+    setTimeout(() => {
+      const i = finishedOrder.indexOf(run.id);
+      if (i !== -1) finishedOrder.splice(i, 1);
+      runs.delete(run.id);
+    }, config.runRetainMs).unref();
     rm(dir, { recursive: true, force: true }).catch(() => {});
     if (!resolved) { resolved = true; resolveDone(evt); }
   }

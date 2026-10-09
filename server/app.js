@@ -331,6 +331,22 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { runId: run.id, mode: resolved.mode });
     }
 
+    // ---- final result of a run (fallback if the live stream drops) ----
+    const resMatch = url.pathname.match(/^\/api\/runs\/([0-9a-f]+)$/);
+    if (req.method === 'GET' && resMatch) {
+      const run = getRun(resMatch[1]);
+      if (!run) return json(res, 404, { status: 'error', error: 'Unknown run.' });
+      return json(res, 200, {
+        finished: run.finished,
+        status: run.status,
+        stdout: run.stdout,
+        stderr: run.stderr,
+        exit_code: run.exitCode,
+        elapsed_ms: run.finished ? run.elapsedMs : Date.now() - run.startedAt,
+        truncated: run.truncated,
+      });
+    }
+
     // ---- stream a run's output ----
     const evMatch = url.pathname.match(/^\/api\/runs\/([0-9a-f]+)\/events$/);
     if (req.method === 'GET' && evMatch) {

@@ -77,6 +77,9 @@ const config = {
   // output and no input, and hard-killed at the absolute cap.
   runIdleMs: num('RUN_IDLE_MS', 30000),
   runMaxMs: num('RUN_MAX_MS', 120000),
+  // How long a finished run is kept so a late SSE subscriber still gets its
+  // output (a fast program can finish before the browser attaches).
+  runRetainMs: num('RUN_RETAIN_MS', 60000),
 
   // REPL / terminal sessions stay open much longer (you are thinking).
   replIdleMs: num('REPL_IDLE_MS', 300000),

@@ -49,6 +49,7 @@ let es = null;
 let runId = null;
 let outputEmpty = true;
 let mode = 'script';
+let receivedEvents = false;
 
 /* ----------------------------- editor -------------------------------- */
 function loadStored(key, def) {
@@ -262,20 +263,37 @@ async function startRun() {
 }
 
 function openStream(id) {
+  receivedEvents = false;
   es = new EventSource(`/api/runs/${id}/events`);
   es.onmessage = (ev) => {
     let e;
     try { e = JSON.parse(ev.data); } catch { return; }
+    receivedEvents = true;
     if (e.type === 'output') {
       appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
     } else if (e.type === 'exit') {
       finishRun(e);
     }
   };
-  es.onerror = () => {
-    // Fires on a normal close too; if we never got an exit event, treat it as done.
+  es.onerror = async () => {
+    // Fires on a normal close too. If the stream never delivered anything,
+    // fetch the result directly instead of showing a bare error.
     if (es) { es.close(); es = null; }
-    if (runId) finishRun({ status: 'error', exit_code: null, elapsed_ms: 0, truncated: false });
+    const id2 = runId;
+    if (!id2) return;
+    if (!receivedEvents) {
+      try {
+        const r = await fetch(`/api/runs/${id2}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.stdout) appendOutput(d.stdout, null);
+          if (d.stderr) appendOutput(d.stderr, 'err');
+          finishRun({ status: d.status || 'error', exit_code: d.exit_code, elapsed_ms: d.elapsed_ms, truncated: d.truncated });
+          return;
+        }
+      } catch { /* fall through */ }
+    }
+    finishRun({ status: 'error', exit_code: null, elapsed_ms: 0, truncated: false });
   };
 }
 

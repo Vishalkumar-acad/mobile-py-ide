@@ -151,6 +151,17 @@ await checkAsync('reports exit status of a failing program', async () => {
   assert.equal(evt.status, 'error');
   assert.match(run.stderr, /boom/);
 });
+await checkAsync('a finished run replays to a late subscriber', async () => {
+  // A fast program finishes before the browser attaches to the stream; its
+  // output must still be delivered (regression).
+  const run = await createRun('print("late")\n', { idleMs: 3000, maxMs: 8000 });
+  await run.done;
+  const seen = [];
+  run.subscribe((e) => seen.push(e));
+  const text = seen.filter((e) => e.type === 'output').map((e) => e.text).join('');
+  assert.match(text, /late/);
+  assert.equal(seen[seen.length - 1].type, 'exit');
+});
 
 // Start a run and answer prompts; `kick` sends the first line without waiting
 // for output (a shell prints no prompt).
