@@ -6,6 +6,15 @@ npm-debug.log*
 .env
 .env.local
 
+# Secrets / keys — never commit these
+*.pem
+*.key
+*.ppk
+*.p12
+id_rsa*
+id_ed25519*
+deploy_key*
+
 # Temp / runtime
 tmp/
 *.log
