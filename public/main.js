@@ -29,6 +29,9 @@ const clearBtn = $('#clearBtn');
 const inputForm = $('#inputForm');
 const inputLine = $('#inputLine');
 const sendBtn = $('#sendBtn');
+const prefillDetails = $('#prefillDetails');
+const prefillCount = $('#prefillCount');
+const prefillClear = $('#prefillClear');
 
 let cmView = null;
 let usingCM = false;
@@ -181,6 +184,15 @@ function onRunClick() {
   else startRun();
 }
 
+// If the pre-fill box somehow holds the program itself (for example stale data
+// left over from an older version), sending it as stdin is never what you want.
+function looksLikePastedCode(code, prefill) {
+  const codeLines = code.split('\n').map((l) => l.trim()).filter(Boolean);
+  const preLines = prefill.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!preLines.length) return false;
+  return preLines.every((l) => codeLines.includes(l));
+}
+
 async function startRun() {
   switchTab('console');
   clearOutput();
@@ -188,14 +200,27 @@ async function startRun() {
   setStatus('running', 'Starting…');
   runBtn.disabled = true;
 
-  if (!window.EventSource) return startRunLegacy();
+  const code = getCode();
+  let prefill = stdinEl.value;
+
+  if (prefill.trim() && looksLikePastedCode(code, prefill)) {
+    prefill = '';
+    stdinEl.value = '';
+    try { localStorage.removeItem(STORAGE_STDIN); } catch { /* ignore */ }
+    updatePrefillUI();
+    appendOutput('⚠ The Pre-fill input box held your program code, so it was not sent.\n', 'muted');
+  } else if (prefill.trim()) {
+    for (const line of prefill.split('\n')) appendOutput(line + '\n', 'echo');
+  }
+
+  if (!window.EventSource) return startRunLegacy(code, prefill);
 
   let data;
   try {
     const res = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: getCode(), stdin: stdinEl.value }),
+      body: JSON.stringify({ code, stdin: prefill }),
     });
     data = await res.json();
     if (!res.ok || !data.runId) {
@@ -256,12 +281,12 @@ async function stopRun() {
 }
 
 // Fallback for browsers without EventSource: one-shot run.
-async function startRunLegacy() {
+async function startRunLegacy(code, prefill) {
   try {
     const res = await fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: getCode(), stdin: stdinEl.value }),
+      body: JSON.stringify({ code, stdin: prefill }),
     });
     const d = await res.json();
     if (d.stdout) appendOutput(d.stdout, null);
@@ -306,10 +331,23 @@ clearBtn.addEventListener('click', () => {
 });
 
 /* ----------------------------- boot ---------------------------------- */
+function updatePrefillUI() {
+  const lines = stdinEl.value.split('\n').filter((l) => l.trim()).length;
+  prefillCount.textContent = lines ? `${lines} line${lines > 1 ? 's' : ''}` : '';
+  if (lines) prefillDetails.open = true;
+}
+
 stdinEl.value = loadStored(STORAGE_STDIN, '');
 stdinEl.addEventListener('input', () => {
   try { localStorage.setItem(STORAGE_STDIN, stdinEl.value); } catch { /* ignore */ }
+  updatePrefillUI();
 });
+prefillClear.addEventListener('click', () => {
+  stdinEl.value = '';
+  try { localStorage.removeItem(STORAGE_STDIN); } catch { /* ignore */ }
+  updatePrefillUI();
+});
+updatePrefillUI();
 initEditor();
 
 window.mobiPy = { startRun, stopRun, getCode, setCode };

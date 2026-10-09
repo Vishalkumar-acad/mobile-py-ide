@@ -48,12 +48,15 @@
         <button id="sendBtn" type="submit" disabled>Send</button>
       </form>
 
-      <details class="prefill">
-        <summary>Pre-fill input (optional)</summary>
+      <details class="prefill" id="prefillDetails">
+        <summary>Pre-fill input (optional) <span id="prefillCount" class="badge"></span></summary>
         <textarea id="stdin" class="stdin-box" spellcheck="false"
           autocapitalize="off" autocomplete="off" autocorrect="off"
           placeholder="One value per line…"></textarea>
-        <div class="prefill-hint">Sent to the program as soon as it starts. Handy when a program asks for several values.</div>
+        <div class="prefill-row">
+          <span class="prefill-hint">Sent to the program as soon as it starts.</span>
+          <button type="button" id="prefillClear" class="mini-btn">Clear</button>
+        </div>
       </details>
 
       <div id="status" class="status"></div>

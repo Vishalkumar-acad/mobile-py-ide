@@ -102,7 +102,7 @@
 print("Hello,", name, "!")</code></pre>
 <p>Run that, type a name in the console input line, press Enter — and it answers. The typed line is echoed in blue so the transcript reads naturally.</p>
 <div class="card ok">
-  <strong>Pre-filling instead.</strong> If a program asks for several values in a row and you already know them, open <em>Pre-fill input</em> and put one value per line. Those lines are delivered as soon as the run starts. Anything beyond them you can still type live.
+  <strong>Pre-filling instead.</strong> If a program asks for several values in a row and you already know them, open <em>Pre-fill input</em> and put one value per line. Those lines are delivered as soon as the run starts, and anything beyond them you can still type live. When the box has content it opens itself and shows a line count, so it is never invisible — and the console echoes what was pre-sent.
 </div>
 <p>If you never provide input, a program that reads it will stop with <code>EOFError</code> — that just means "no input was given".</p>
 <p>A run is stopped automatically if it goes quiet: after about 30 seconds with no output and no input, and at a hard cap of 2 minutes. You can also press <strong>■ Stop</strong> yourself.</p>
@@ -143,7 +143,7 @@ print("Hello,", name, "!")</code></pre>
 <table>
   <tr><th>What you see</th><th>What it means</th></tr>
   <tr><td><code>EOFError: EOF when reading a line</code></td><td>The program asked for input but none arrived. Type into the <strong>›</strong> line while it runs, or pre-fill the input box.</td></tr>
-  <tr><td><code>ValueError: could not convert string to float</code></td><td>The value you gave was not a number. If you pre-filled the box, check you did not paste code into it by mistake.</td></tr>
+  <tr><td><code>ValueError: could not convert string to float: '...'</code> where the value shown is your own code</td><td>Something was pasted into the <em>Pre-fill input</em> box, so the program received your code as input. The IDE now detects this, clears the box and warns you in the console. You can also press <strong>Clear</strong> in that section.</td></tr>
   <tr><td>Status: <em>Stopped: no activity</em></td><td>The program produced nothing for ~30 seconds, so it was stopped — usually an endless loop.</td></tr>
   <tr><td>Status: <em>Time limit reached</em></td><td>The run hit the 2-minute cap.</td></tr>
   <tr><td><code>Error: importing 'os' is not allowed</code></td><td>The checker blocked a module. See the list above.</td></tr>
