@@ -6,7 +6,7 @@
 # Edit WorkingDirectory, User and EnvironmentFile to match your server.
 
 [Unit]
-Description=Mobile Py IDE (sandboxed web Python runner)
+Description=PyPad (sandboxed Python IDE)
 After=network.target
 
 [Service]

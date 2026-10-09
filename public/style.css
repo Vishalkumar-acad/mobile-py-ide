@@ -20,6 +20,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
@@ -180,6 +181,7 @@ main {
   outline: none;
 }
 .console-input input:focus { border-color: var(--accent); }
+.console-input.active input { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47, 129, 247, 0.25); }
 .console-input input:disabled { opacity: 0.5; }
 .console-input button {
   flex: 0 0 auto;

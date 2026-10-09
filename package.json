@@ -1,7 +1,7 @@
 {
-  "name": "mobile-py-ide",
+  "name": "pypad",
   "version": "1.0.0",
-  "description": "Lightweight, sandboxed, mobile-optimized web Python IDE for personal use. Zero npm dependencies.",
+  "description": "PyPad — a lightweight, sandboxed Python IDE that works on phone and desktop. Zero npm dependencies.",
   "type": "module",
   "main": "server/app.js",
   "scripts": {

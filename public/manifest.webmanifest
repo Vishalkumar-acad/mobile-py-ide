@@ -1,7 +1,7 @@
 {
-  "name": "Mobile Py IDE",
-  "short_name": "Py IDE",
-  "description": "Lightweight, sandboxed, mobile-optimized web Python IDE.",
+  "name": "PyPad",
+  "short_name": "PyPad",
+  "description": "PyPad — a lightweight, sandboxed Python IDE that works on phone and desktop.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

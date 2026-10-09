@@ -224,7 +224,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/health') {
       return json(res, 200, {
         ok: true,
-        service: 'mobile-py-ide',
+        service: 'pypad',
         interactive: true,
         modes: ['script', 'repl', ...(config.allowTerminal ? ['terminal'] : [])],
         terminal: config.allowTerminal,
@@ -383,7 +383,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(config.port, config.host, () => {
   // eslint-disable-next-line no-console
-  console.log(`Mobile Py IDE running at http://${config.host}:${config.port}`);
+  console.log(`PyPad running at http://${config.host}:${config.port}`);
   console.log(`  modes=script,repl${config.allowTerminal ? ',terminal' : ''}  packages=${config.allowPackageInstall}  memory=${config.memoryLimitMb}MB`);
 });
 

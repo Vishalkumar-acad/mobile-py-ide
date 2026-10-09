@@ -124,7 +124,7 @@ chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 log "Installing systemd unit /etc/systemd/system/${SERVICE_NAME}.service"
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=Mobile Py IDE (sandboxed web Python runner)
+Description=PyPad (sandboxed Python IDE)
 After=network.target
 
 [Service]

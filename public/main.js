@@ -33,6 +33,9 @@ const prefillDetails = $('#prefillDetails');
 const prefillCount = $('#prefillCount');
 const prefillClear = $('#prefillClear');
 const modebar = $('#modebar');
+const editorPanel = $('#editor');
+const codeTab = document.querySelector('.tab[data-tab="editor"]');
+const inputRow = $('#inputForm');
 const pkgBtn = $('#pkgBtn');
 const pkgDialog = $('#pkgDialog');
 const pkgInput = $('#pkgInput');
@@ -184,6 +187,7 @@ function setRunning(on) {
   runIcon.textContent = on ? '■' : '▶';
   inputLine.disabled = !on;
   sendBtn.disabled = !on;
+  inputRow.classList.toggle('active', on);
   if (!on) inputLine.value = '';
 }
 
@@ -250,7 +254,11 @@ async function startRun() {
   runId = data.runId;
   runBtn.disabled = false;
   setRunning(true);
+  if (mode === 'repl') setStatus('running', 'REPL ready — type below and press Enter');
+  else if (mode === 'terminal') setStatus('running', 'Terminal ready — type below and press Enter');
+  else setStatus('running', 'Running…');
   openStream(runId);
+  if (mode !== 'script') inputLine.focus();
 }
 
 function openStream(id) {
@@ -368,7 +376,12 @@ function setMode(next) {
   document.querySelectorAll('.modebar .mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === next));
   document.querySelector('.console-input .prompt').textContent = next === 'terminal' ? '$' : '›';
   prefillDetails.hidden = next !== 'script';
+  // The editor belongs to Script mode. Hiding it in REPL/Terminal removes any
+  // doubt about where to type.
+  editorPanel.hidden = next !== 'script';
+  codeTab.hidden = next !== 'script';
   switchTab('console');
+  if (next === 'script' && usingCM) setTimeout(() => cmView.requestMeasure(), 0);
   clearOutput();
   const hint = next === 'script' ? 'Press ▶ Run to execute your code.'
     : next === 'repl' ? 'Press ▶ Run to start a Python REPL, then type below.'

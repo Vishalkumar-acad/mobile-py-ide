@@ -1,9 +1,9 @@
-# Mobile Py IDE 🐍
+# PyPad 🐍
 
-A lightweight, sandboxed, **mobile- and desktop-friendly** web Python IDE.
-Write Python in a browser, press **Run**, and watch it work — including a
-**live console** where `input()` pauses and waits for you to type, just like a
-real terminal.
+A lightweight, sandboxed Python IDE that works on your **phone and your
+desktop**. Write Python in a browser, press **Run**, and watch it work —
+including a **live console** where `input()` pauses and waits for you to type,
+just like a real terminal.
 
 - **Live console.** Programs stream their output as they run and can ask for
   input mid-run. No more `EOFError` because you forgot to fill a box first.
@@ -288,6 +288,10 @@ curl -s localhost:3000/api/run \
 - Terminal mode is remote shell access. It is off by default; enable it only
   behind Cloudflare Access. It runs as the unprivileged service user inside the
   systemd sandbox, so it cannot use `sudo` or write outside the venv and `/tmp`.
+- The deployment identifiers (`/opt/mobile-py-ide`, the `mobilepy` user and the
+  `mobile-py-ide` systemd unit) keep their original names — only the visible
+  product name changed to PyPad. Renaming them would mean migrating a live
+  install for no benefit.
 - CodeMirror is pulled from `esm.sh`; if you want a fully offline IDE, vendor it
   locally, or let the plain-textarea fallback take over.
 
