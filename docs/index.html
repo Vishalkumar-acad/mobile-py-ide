@@ -65,6 +65,7 @@
     <a href="#input">Input &amp; output</a>
     <a href="#libraries">Libraries</a>
     <a href="#packages">Installing packages</a>
+    <a href="#files">Files &amp; storage</a>
     <a href="#blocked">What is blocked</a>
     <a href="#fix">Troubleshooting</a>
     <a href="#api">API</a>
@@ -146,13 +147,26 @@ print("Hello,", name, "!")</code></pre>
   <strong>Why not pip from anywhere?</strong> Letting a web page install arbitrary code onto the server is a security hole, and a heavy package can fill the disk or the memory. So installation is limited to a reviewed list, and it runs with a memory cap and a timeout.
 </div>
 
+<h2 id="files">Files &amp; storage</h2>
+<p>Programs run inside a <strong>workspace</strong> folder on the server, and anything they save with a relative path stays there for the next run. So this works:</p>
+<pre><code>with open("notes.txt", "w") as f:
+    f.write("saved for later")
+
+# next run:
+print(open("notes.txt").read())</code></pre>
+<p>Tap <strong>Files</strong> in the top bar to see everything in the workspace, download a file, upload one, or delete one. The line at the bottom shows how much space is used out of the limit.</p>
+<p>Writes are confined to that folder — the rest of the server is read-only to your programs, so a wrong path cannot damage anything. <code>os</code> and <code>open()</code> are available for this; the process calls inside <code>os</code> (<code>system</code>, <code>popen</code>, <code>exec*</code>, <code>fork</code>) are not.</p>
+<div class="card note">
+  <strong>Space.</strong> The workspace is limited — 10 GB by default. Uploads beyond it are refused, and a single file written by a program is capped at <code>MAX_FILE_MB</code> (256 MB by default). Raise either on the server with <code>WORKSPACE_MAX_MB</code> and <code>MAX_FILE_MB</code>.
+</div>
+
 <h2 id="blocked">What is blocked, and why</h2>
 <p>Before anything runs, the server checks the code and refuses a few things:</p>
 <ul>
   <li><strong>Heavy libraries</strong> — <code>torch</code>, <code>tensorflow</code>, <code>keras</code>, <code>transformers</code>, <code>cv2</code>, <code>sklearn</code>, <code>scipy</code>, <code>pandas</code>, <code>matplotlib</code>. They would not fit the server's memory.</li>
-  <li><strong>System access</strong> — <code>os</code>, <code>subprocess</code>, <code>ctypes</code>, <code>multiprocessing</code>, <code>pty</code>.</li>
+  <li><strong>Processes</strong> — <code>subprocess</code>, <code>ctypes</code>, <code>multiprocessing</code>, <code>pty</code>, and the process calls inside <code>os</code> (<code>system</code>, <code>popen</code>, <code>exec*</code>, <code>fork</code>, <code>kill</code>, …).</li>
   <li><strong>Network</strong> — <code>socket</code>, <code>ftplib</code>, <code>smtplib</code>, <code>paramiko</code>.</li>
-  <li><strong>Escapes</strong> — <code>eval</code>, <code>exec</code>, <code>open</code>, <code>__import__</code>, and attributes like <code>__class__</code>.</li>
+  <li><strong>Escapes</strong> — <code>eval</code>, <code>exec</code>, <code>__import__</code>, and attributes like <code>__class__</code>. (<code>open()</code> is allowed for the workspace.)</li>
 </ul>
 <p>Each program runs in its own temporary folder, as a limited subprocess with a memory cap, and the folder is deleted the moment it finishes. A file that merely <em>mentions</em> a blocked word inside a string or comment is fine — the checker reads the real code.</p>
 
@@ -179,7 +193,10 @@ print("Hello,", name, "!")</code></pre>
   <tr><td><code>POST /api/runs/:id/input</code></td><td>Send <code>{data}</code> to the running program.</td></tr>
   <tr><td><code>POST /api/runs/:id/kill</code></td><td>Stop the run.</td></tr>
   <tr><td><code>GET /api/packages</code></td><td>The allowed package list.</td></tr>
-  <tr><td><code>POST /api/packages</code></td><td>Install <code>{name}</code> from the allow-list.</td></tr>
+  <tr><td><code>GET /api/files</code></td><td>List workspace files.</td></tr>
+  <tr><td><code>POST /api/files?name=…</code></td><td>Upload a file into the workspace.</td></tr>
+  <tr><td><code>GET /api/files/:name</code></td><td>Download a file.</td></tr>
+  <tr><td><code>DELETE /api/files/:name</code></td><td>Delete a file.</td></tr>
 </table>
 <pre><code>curl -s localhost:3000/api/run \
   -H 'Content-Type: application/json' \

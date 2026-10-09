@@ -42,6 +42,12 @@ const pkgInput = $('#pkgInput');
 const pkgInstall = $('#pkgInstall');
 const pkgOut = $('#pkgOut');
 const pkgAllowed = $('#pkgAllowed');
+const filesBtn = $('#filesBtn');
+const filesDialog = $('#filesDialog');
+const fileInput = $('#fileInput');
+const uploadBtn = $('#uploadBtn');
+const fileList = $('#fileList');
+const fileOut = $('#fileOut');
 
 let cmView = null;
 let usingCM = false;
@@ -456,6 +462,89 @@ pkgBtn.addEventListener('click', openPackages);
 pkgInstall.addEventListener('click', installPackage);
 pkgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); installPackage(); } });
 
+/* --------------------------- workspace files ------------------------- */
+function fmtSize(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+async function loadFiles() {
+  fileList.textContent = '';
+  try {
+    const res = await fetch('/api/files');
+    const d = await res.json();
+    if (!d.files || !d.files.length) {
+      const p = document.createElement('div');
+      p.className = 'muted';
+      p.textContent = 'No files yet. Upload one above, or run a program that writes one.';
+      fileList.appendChild(p);
+      return;
+    }
+    d.files.forEach((f) => {
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      const a = document.createElement('a');
+      a.className = 'file-name';
+      a.href = `/api/files/${encodeURIComponent(f.name)}`;
+      a.setAttribute('download', '');
+      a.textContent = f.name;
+      const size = document.createElement('span');
+      size.className = 'file-size';
+      size.textContent = fmtSize(f.size);
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'mini-btn';
+      del.textContent = 'Delete';
+      del.addEventListener('click', async () => {
+        await fetch(`/api/files/${encodeURIComponent(f.name)}`, { method: 'DELETE' }).catch(() => {});
+        loadFiles();
+      });
+      row.append(a, size, del);
+      fileList.appendChild(row);
+    });
+    const total = document.createElement('div');
+    total.className = 'file-total';
+    total.textContent = `${d.files.length} file(s) · ${fmtSize(d.total)} of ${fmtSize(d.limit)} used`;
+    fileList.appendChild(total);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function openFiles() {
+  fileOut.hidden = true;
+  fileOut.textContent = '';
+  if (typeof filesDialog.showModal === 'function') filesDialog.showModal();
+  else filesDialog.setAttribute('open', '');
+  loadFiles();
+}
+
+async function uploadFiles() {
+  const files = Array.from(fileInput.files || []);
+  if (!files.length) return;
+  uploadBtn.disabled = true;
+  fileOut.hidden = false;
+  const lines = [];
+  for (const f of files) {
+    try {
+      const res = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f });
+      const d = await res.json();
+      lines.push(`${d.ok ? '✓' : '✗'} ${f.name}${d.ok ? ` (${fmtSize(d.size || 0)})` : ` — ${d.error || 'failed'}`}`);
+    } catch (err) {
+      lines.push(`✗ ${f.name} — ${err.message}`);
+    }
+  }
+  fileOut.textContent = lines.join('\n');
+  fileInput.value = '';
+  uploadBtn.disabled = false;
+  loadFiles();
+}
+
+filesBtn.addEventListener('click', openFiles);
+uploadBtn.addEventListener('click', uploadFiles);
+
 /* --------------------------- capabilities ---------------------------- */
 (async () => {
   try {
@@ -466,6 +555,7 @@ pkgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.prevent
       if (t) t.hidden = false;
     }
     if (h.packages) pkgBtn.hidden = false;
+    if (h.files) filesBtn.hidden = false;
   } catch { /* offline: keep the defaults */ }
 })();
 

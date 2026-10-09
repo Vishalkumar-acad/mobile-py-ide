@@ -18,6 +18,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo">🐍</span><span class="brand-text">PyPad</span></div>
     <div class="actions">
+      <button id="filesBtn" class="ghost-btn" type="button" title="Workspace files" hidden>Files</button>
       <button id="pkgBtn" class="ghost-btn" type="button" title="Install a package" hidden>Packages</button>
       <button id="clearBtn" class="ghost-btn" type="button" title="Clear console">Clear</button>
       <button id="runBtn" class="run-btn" type="button">
@@ -115,6 +116,20 @@
     </div>
     <div class="pkg-allowed" id="pkgAllowed"></div>
     <pre id="pkgOut" class="pkg-out" hidden></pre>
+  </dialog>
+
+  <dialog id="filesDialog" class="dialog">
+    <form method="dialog" class="dialog-head">
+      <h2>Workspace files</h2>
+      <button class="mini-btn" type="submit">Close</button>
+    </form>
+    <p class="dialog-note">Programs run in this folder, so anything they write with a relative path is saved here and is still here next time. Writes outside it are not possible.</p>
+    <div class="pkg-row">
+      <input id="fileInput" type="file" multiple />
+      <button id="uploadBtn" type="button" class="run-btn small">Upload</button>
+    </div>
+    <div class="file-list" id="fileList"></div>
+    <pre id="fileOut" class="pkg-out" hidden></pre>
   </dialog>
 
   <script type="module" src="main.js"></script>

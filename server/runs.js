@@ -5,7 +5,7 @@
 // work like a real terminal. Runs are resource-limited and always cleaned up.
 
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -31,7 +31,8 @@ export function activeRunCount() {
 function buildCommand({ filePath, kind, memoryMb, maxMs }) {
   const memKb = Math.max(16, Math.round(memoryMb)) * 1024;
   const cpuSec = Math.max(2, Math.ceil(maxMs / 1000) + 2);
-  const limits = `ulimit -v ${memKb} 2>/dev/null; ulimit -t ${cpuSec} 2>/dev/null; ulimit -f 2048 2>/dev/null;`;
+  const fileBlocks = Math.max(64, Math.round(config.maxFileMb)) * 2048; // 512-byte blocks
+  const limits = `ulimit -v ${memKb} 2>/dev/null; ulimit -t ${cpuSec} 2>/dev/null; ulimit -f ${fileBlocks} 2>/dev/null;`;
 
   if (kind === 'bash') {
     return `${limits} exec bash --noprofile --norc -s`;
@@ -54,6 +55,10 @@ export async function createRun(code, opts = {}) {
   const memoryMb = opts.memoryMb ?? config.memoryLimitMb;
 
   const id = crypto.randomBytes(9).toString('hex');
+  // The workspace is the working directory, so files written with a relative
+  // path survive between runs. Scratch files (and the .py itself) go in a temp
+  // dir that is removed afterwards.
+  await mkdir(config.workspaceDir, { recursive: true }).catch(() => {});
   const dir = await mkdtemp(path.join(tmpdir(), 'mobi-py-'));
   let file = null;
   if (kind === 'python') {
@@ -189,7 +194,7 @@ export async function createRun(code, opts = {}) {
     PATH: '/usr/local/bin:/usr/bin:/bin',
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
-    HOME: dir,
+    HOME: config.workspaceDir,
     TMPDIR: dir,
     PYTHONIOENCODING: 'utf-8',
     PYTHONDONTWRITEBYTECODE: '1',
@@ -203,7 +208,7 @@ export async function createRun(code, opts = {}) {
 
   try {
     run.child = spawn('bash', argv, {
-      cwd: dir,
+      cwd: config.workspaceDir,
       env,
       detached: true,
       uid: config.runAsUid,

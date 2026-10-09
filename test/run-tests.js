@@ -1,11 +1,13 @@
 // Dependency-free test suite: `npm test` (or `node test/run-tests.js`).
 
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { validate } from '../server/validator.js';
 import { execute } from '../server/executor.js';
 import { createRun } from '../server/runs.js';
 import { REPL_SOURCE } from '../server/modes.js';
 import { isAllowed } from '../server/packages.js';
+import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
 
 let passed = 0;
 let failed = 0;
@@ -64,8 +66,8 @@ check('blocks heavy ML libraries', () => {
   assert.equal(r.ok, false);
   assert.match(r.reason, /torch/);
 });
-check('blocks os import', () => {
-  assert.equal(validate('import os').ok, false);
+check('allows import os for file work', () => {
+  assert.equal(validate('import os').ok, true);
 });
 check('blocks subprocess import', () => {
   assert.equal(validate('import subprocess').ok, false);
@@ -73,8 +75,8 @@ check('blocks subprocess import', () => {
 check('blocks eval()', () => {
   assert.equal(validate('eval("1+1")').ok, false);
 });
-check('blocks open()', () => {
-  assert.equal(validate('open("/etc/passwd")').ok, false);
+check('allows open() for the workspace', () => {
+  assert.equal(validate('open("notes.txt", "w")').ok, true);
 });
 check('blocks __import__', () => {
   assert.equal(validate('__import__("os")').ok, false);
@@ -87,6 +89,15 @@ check('does NOT trip on blocked words inside strings', () => {
 });
 check('does NOT trip on blocked words inside comments', () => {
   assert.equal(validate('# import os\nprint("ok")').ok, true);
+});
+check('still blocks os.system', () => {
+  assert.equal(validate('import os\nos.system("ls")').ok, false);
+});
+check('still blocks os.popen', () => {
+  assert.equal(validate('import os\nos.popen("ls")').ok, false);
+});
+check('blocks process calls reached by alias', () => {
+  assert.equal(validate('import os as x\nx.system("ls")').ok, false);
 });
 check('rejects empty code', () => {
   assert.equal(validate('   ').ok, false);
@@ -201,6 +212,29 @@ check('accepts underscore spelling', () => assert.equal(isAllowed('python_dateut
 check('refuses a heavy package', () => assert.equal(isAllowed('torch'), false));
 check('refuses shell metacharacters', () => assert.equal(isAllowed('rich; rm -rf /'), false));
 check('refuses an unknown name', () => assert.equal(isAllowed('definitely-not-a-real-pkg'), false));
+
+console.log('\nWorkspace files');
+check('rejects path traversal and absolute names', () => {
+  assert.equal(safePath('../x'), null);
+  assert.equal(safePath('a/../b'), null);
+  assert.equal(safePath('/etc/passwd'), null);
+  assert.equal(safePath(''), null);
+  assert.notEqual(safePath('notes.txt'), null);
+  assert.notEqual(safePath('data/report.txt'), null);
+});
+await checkAsync('writes and reads a file back', async () => {
+  const w = await writeFile('test-roundtrip.txt', Readable.from([Buffer.from('hello')]), 1024);
+  assert.equal(w.ok, true);
+  const f = await readFile('test-roundtrip.txt');
+  assert.equal(f.data.toString(), 'hello');
+  assert.equal(await deleteFile('test-roundtrip.txt'), true);
+  assert.equal(await readFile('test-roundtrip.txt'), null);
+});
+await checkAsync('refuses a file over the size cap', async () => {
+  const w = await writeFile('too-big.txt', Readable.from([Buffer.alloc(4096)]), 1024);
+  assert.equal(w.ok, false);
+  assert.equal(await readFile('too-big.txt'), null);
+});
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

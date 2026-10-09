@@ -22,6 +22,7 @@ import { execute } from './executor.js';
 import { createRun, getRun } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
 import { allowlist, installPackage } from './packages.js';
+import { listFiles, readFile, writeFile, deleteFile, safePath, ensureWorkspace, limitBytes, totalSize } from './files.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -229,6 +230,8 @@ const server = http.createServer(async (req, res) => {
         modes: ['script', 'repl', ...(config.allowTerminal ? ['terminal'] : [])],
         terminal: config.allowTerminal,
         packages: config.allowPackageInstall,
+        files: config.allowFileAccess,
+        workspace_mb: config.workspaceMaxMb,
         timeout_ms: config.timeoutMs,
         run_idle_ms: config.runIdleMs,
         run_max_ms: config.runMaxMs,
@@ -385,6 +388,47 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // ---- workspace files ----
+    if (req.method === 'GET' && url.pathname === '/api/files') {
+      return json(res, 200, await listFiles());
+    }
+    if (req.method === 'POST' && url.pathname === '/api/files') {
+      if (isRateLimited(clientIp(req))) {
+        return json(res, 429, { ok: false, error: 'Too many requests, please slow down.' });
+      }
+      const name = url.searchParams.get('name') || '';
+      if (!safePath(name)) return json(res, 400, { ok: false, error: 'Invalid file name.' });
+      const used = await totalSize();
+      const cap = Math.min(limitBytes() - used, Math.round(config.maxUploadMb) * 1024 * 1024);
+      if (cap <= 0) {
+        return json(res, 413, { ok: false, error: 'The workspace is full.' });
+      }
+      const result = await writeFile(name, req, cap);
+      return json(res, result.ok ? 200 : 413, result);
+    }
+    const fileMatch = url.pathname.match(/^\/api\/files\/(.+)$/);
+    if (fileMatch && (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE')) {
+      const name = decodeURIComponent(fileMatch[1]);
+      if (req.method === 'DELETE') {
+        const ok = await deleteFile(name);
+        return json(res, ok ? 200 : 404, { ok });
+      }
+      const f = await readFile(name);
+      if (!f) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS });
+        res.end('Not found');
+        return undefined;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': f.data.length,
+        'Content-Disposition': `attachment; filename="${path.basename(f.rel).replace(/"/g, '')}"`,
+        ...SECURITY_HEADERS,
+      });
+      res.end(req.method === 'HEAD' ? undefined : f.data);
+      return undefined;
+    }
+
     if (req.method === 'GET' || req.method === 'HEAD') {
       return serveStatic(req, res);
     }
@@ -395,6 +439,11 @@ const server = http.createServer(async (req, res) => {
   } catch {
     return json(res, 500, { status: 'error', error: 'Internal server error.' });
   }
+});
+
+ensureWorkspace().catch(() => {
+  // eslint-disable-next-line no-console
+  console.warn('Could not create the workspace directory:', config.workspaceDir);
 });
 
 server.listen(config.port, config.host, () => {

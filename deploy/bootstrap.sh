@@ -88,6 +88,11 @@ else
   warn "Could not create a virtual environment; falling back to the system python3."
 fi
 
+# --- 4c. workspace (where your programs keep files) ---------------------
+mkdir -p "$APP_DIR/workspace"
+chown "$APP_USER:$APP_USER" "$APP_DIR/workspace"
+log "Workspace at $APP_DIR/workspace"
+
 # --- 5. env file --------------------------------------------------------
 if [ ! -f "$APP_DIR/.env" ]; then
   log "Writing $APP_DIR/.env"
@@ -102,6 +107,7 @@ STRICT_MODE=false
 ALLOW_PACKAGE_INSTALL=true
 ALLOW_TERMINAL=false
 PYTHON_BIN=${VENV_PY}
+WORKSPACE_DIR=${APP_DIR}/workspace
 EOF
 else
   log "$APP_DIR/.env already exists, leaving it untouched"
@@ -118,6 +124,7 @@ ensure_env() {
 ensure_env PYTHON_BIN "$VENV_PY"
 ensure_env ALLOW_PACKAGE_INSTALL "true"
 ensure_env ALLOW_TERMINAL "false"
+ensure_env WORKSPACE_DIR "$APP_DIR/workspace"
 chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 
 # --- 6. systemd service -------------------------------------------------
@@ -142,7 +149,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/tmp ${APP_DIR}/venv
+ReadWritePaths=/tmp ${APP_DIR}/venv ${APP_DIR}/workspace
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

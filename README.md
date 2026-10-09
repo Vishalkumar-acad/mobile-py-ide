@@ -13,6 +13,8 @@ just like a real terminal.
   prompt), and an optional **Terminal**.
 - **Install packages from the IDE.** Tap Packages, pick from a reviewed
   allow-list of light libraries, watch pip run.
+- **A workspace that persists.** Programs run in a folder whose files survive
+  between runs; upload, download and delete them from the Files panel.
 - **Zero npm dependencies.** The backend uses only Node's built-in modules —
   nothing to `npm install`, fewer things to break.
 - **Sandboxed runner.** Every program runs in its own temp folder, as a
@@ -59,6 +61,7 @@ mobile-py-ide/
 │   ├── runs.js        # interactive streaming run engine (python + bash)
 │   ├── modes.js       # the REPL driver source
 │   ├── packages.js    # allow-listed pip installs
+│   ├── files.js       # the persistent workspace (list/read/write/delete)
 │   └── executor.js    # one-shot wrapper around runs.js
 ├── public/
 │   ├── index.html     # responsive layout (mobile tabs + desktop split)
@@ -115,6 +118,27 @@ The console has three modes:
   `ALLOW_TERMINAL=true` in `.env`. Only do this while the IDE stays private
   (behind Cloudflare Access) — it is remote shell access.
 
+## Workspace and files
+
+Programs run with a **workspace** directory as their working directory, so a
+relative path is saved and is still there next run:
+
+```python
+with open("notes.txt", "w") as f:
+    f.write("saved for later")
+```
+
+Tap **Files** in the IDE to list, upload, download and delete those files. The
+panel shows space used against `WORKSPACE_MAX_MB`.
+
+Writes are confined to the workspace: the systemd sandbox keeps the rest of the
+filesystem read-only, so a wrong path cannot damage anything. Reads elsewhere
+are still possible (the sandbox does not restrict reading), which is fine on a
+personal server. Set `ALLOW_FILE_ACCESS=false` to go back to blocking
+`open()`/`os` entirely.
+
+Point `WORKSPACE_DIR` at another mount if you attach a bigger disk.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and edit. Highlights:
@@ -133,6 +157,11 @@ Copy `.env.example` to `.env` and edit. Highlights:
 | `ALLOW_PACKAGE_INSTALL` | `true` | Allow allow-listed pip installs from the IDE |
 | `EXTRA_PACKAGES` | – | Extra package names to allow |
 | `ALLOW_TERMINAL` | `false` | Enable the shell (terminal) mode |
+| `WORKSPACE_DIR` | `<app>/workspace` | Where program files are kept |
+| `ALLOW_FILE_ACCESS` | `true` | Allow `open()`/`os` for workspace file work |
+| `MAX_FILE_MB` | `256` | Largest single file a program may write |
+| `WORKSPACE_MAX_MB` | `10240` | Workspace size limit (10 GB) |
+| `MAX_UPLOAD_MB` | `256` | Largest upload from the browser |
 | `STRICT_MODE` | `false` | `true` = only allow-listed modules may be imported |
 | `UNBLOCK_MODULES` | – | Remove names from the built-in blocked list |
 | `DISABLE_NETWORK` | `false` | Wrap the runner in `unshare -n` (needs root or userns) |
@@ -247,11 +276,14 @@ merely *looks* like code can't fool it) and refuses:
 
 - **Heavy / ML libraries:** `torch`, `tensorflow`, `keras`, `transformers`,
   `jax`, `cv2`, `sklearn`, `scipy`, `pandas`, `matplotlib`, …
-- **OS / process / network:** `os`, `subprocess`, `ctypes`, `multiprocessing`,
-  `socket`, `pty`, `resource`, `signal`, `ftplib`, `smtplib`, `paramiko`, …
+- **OS / process:** `subprocess`, `ctypes`, `multiprocessing`, `socket`, `pty`,
+  `resource`, `signal`, `ftplib`, `smtplib`, `paramiko`, …, plus the process
+  calls inside `os` (`system`, `popen`, `exec*`, `spawn*`, `fork`, `kill`, …).
+  (`os`, `shutil`, `pathlib` themselves are allowed for file work when
+  `ALLOW_FILE_ACCESS` is on.)
 - **Dynamic import / serialization:** `importlib`, `runpy`, `pickle`, `marshal`, …
-- **Dangerous calls:** `eval`, `exec`, `compile`, `open`, `__import__`,
-  `globals`, `locals`, `setattr`, `delattr`, …
+- **Dangerous calls:** `eval`, `exec`, `compile`, `__import__`, `globals`,
+  `locals`, `setattr`, `delattr`, … (`open()` is allowed for the workspace.)
 - **Sandbox-escape attributes:** `__subclasses__`, `__globals__`,
   `__builtins__`, `__class__`, `__code__`, …
 
@@ -271,6 +303,10 @@ with `UNBLOCK_MODULES`.
 | `POST` | `/api/runs/:id/kill` | – | `{ ok }` |
 | `GET` | `/api/packages` | – | allowed package list |
 | `POST` | `/api/packages` | `{ name }` | install result |
+| `GET` | `/api/files` | – | workspace file list |
+| `POST` | `/api/files?name=…` | raw body | upload a file |
+| `GET` | `/api/files/:name` | – | download a file |
+| `DELETE` | `/api/files/:name` | – | delete a file |
 
 ```bash
 curl -s localhost:3000/api/run \
@@ -284,7 +320,8 @@ curl -s localhost:3000/api/run \
   and resource limits raise the bar a lot; if you ever expose it publicly, also
   run the runner as a dedicated low-privilege user and consider a container or
   VM per execution.
-- `os` and file access are blocked, so programs can't read or write files.
+- `open()` and `os` are allowed for the workspace, so programs can read and
+  write files there. They cannot write outside it.
 - Terminal mode is remote shell access. It is off by default; enable it only
   behind Cloudflare Access. It runs as the unprivileged service user inside the
   systemd sandbox, so it cannot use `sudo` or write outside the venv and `/tmp`.

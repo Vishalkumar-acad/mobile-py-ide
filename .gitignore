@@ -17,6 +17,7 @@ deploy_key*
 
 # Temp / runtime
 tmp/
+workspace/
 *.log
 *.pyc
 __pycache__/

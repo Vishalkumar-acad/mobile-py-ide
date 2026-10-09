@@ -13,7 +13,7 @@ const BLOCKED_PATTERNS = [
   { re: /\beval\s*\(/, reason: 'eval() is not allowed' },
   { re: /\bexec\s*\(/, reason: 'exec() is not allowed' },
   { re: /\bcompile\s*\(/, reason: 'compile() is not allowed' },
-  { re: /\bopen\s*\(/, reason: 'file access via open() is not allowed' },
+  { re: /\bopen\s*\(/, reason: 'file access via open() is not allowed', fileAccess: true },
   { re: /\bglobals\s*\(/, reason: 'globals() is not allowed' },
   { re: /\blocals\s*\(/, reason: 'locals() is not allowed' },
   { re: /\bbreakpoint\s*\(/, reason: 'breakpoint() is not allowed' },
@@ -28,6 +28,13 @@ const BLOCKED_PATTERNS = [
   { re: /__getattribute__/, reason: 'sandbox-escape attribute (__getattribute__) is not allowed' },
   { re: /__reduce__/, reason: 'sandbox-escape attribute (__reduce__) is not allowed' },
   { re: /__code__/, reason: 'sandbox-escape attribute (__code__) is not allowed' },
+  // Process / system calls. `os` is importable now (for file work), so these are
+  // blocked by name — however they are reached, including aliases and
+  // `from os import system`.
+  {
+    re: /\b(system|popen|fork|forkpty|kill|killpg|setuid|setgid|seteuid|setegid|setreuid|setregid|setgroups|chroot|_exit|execl|execle|execlp|execlpe|execv|execve|execvp|execvpe|spawnl|spawnle|spawnlp|spawnlpe|spawnv|spawnve|spawnvp|spawnvpe)\s*\(/,
+    reason: 'process/system calls are not allowed',
+  },
 ];
 
 // Replace comments and string literals with spaces so the regex checks
@@ -127,8 +134,10 @@ export function validate(code) {
     }
   }
 
-  // Dangerous calls / attributes.
-  for (const { re, reason } of BLOCKED_PATTERNS) {
+  // Dangerous calls / attributes. When file access is enabled, open() is
+  // allowed — writes are still confined to the workspace by the systemd sandbox.
+  for (const { re, reason, fileAccess } of BLOCKED_PATTERNS) {
+    if (fileAccess && config.allowFileAccess) continue;
     if (re.test(stripped)) return { ok: false, reason };
   }
 

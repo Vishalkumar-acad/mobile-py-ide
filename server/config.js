@@ -1,5 +1,10 @@
-// Central configuration for the Mobile Py IDE backend.
+// Central configuration for the PyPad backend.
 // Every value can be overridden with an environment variable (see .env.example).
+
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function num(name, def) {
   const v = process.env[name];
@@ -60,6 +65,11 @@ const BASE_PACKAGES = [
   'alive-progress', 'questionary', 'rich-argparse',
 ];
 
+// Modules that only make sense once programs are allowed to touch files.
+const FILE_RELATED_MODULES = [
+  'os', 'shutil', 'pathlib', 'glob', 'tempfile', 'filecmp', 'stat', 'fileinput', 'configparser',
+];
+
 const config = {
   // HTTP
   host: process.env.HOST || '127.0.0.1',
@@ -96,6 +106,15 @@ const config = {
   packageTimeoutMs: num('PACKAGE_TIMEOUT_MS', 120000),
   packageAllowlist: [...BASE_PACKAGES, ...list('EXTRA_PACKAGES', [])],
 
+  // Persistent workspace: programs run here, and files they write survive
+  // between runs. Writes elsewhere are still impossible (the systemd sandbox
+  // keeps the rest of the filesystem read-only).
+  workspaceDir: process.env.WORKSPACE_DIR || path.resolve(__dirname, '..', 'workspace'),
+  allowFileAccess: bool('ALLOW_FILE_ACCESS', true),
+  maxFileMb: num('MAX_FILE_MB', 256),
+  workspaceMaxMb: num('WORKSPACE_MAX_MB', 10240),
+  maxUploadMb: num('MAX_UPLOAD_MB', 256),
+
   // Sandbox hardening
   // DISABLE_NETWORK needs either root or working user-namespaces (see README).
   disableNetwork: bool('DISABLE_NETWORK', false),
@@ -118,6 +137,7 @@ const config = {
   // install pandas yourself on a big-enough server).
   blockedModules: (() => {
     const unblock = new Set(list('UNBLOCK_MODULES', []));
+    if (bool('ALLOW_FILE_ACCESS', true)) for (const m of FILE_RELATED_MODULES) unblock.add(m);
     return [...BASE_BLOCKED, ...list('EXTRA_BLOCKED_MODULES', [])].filter((m) => !unblock.has(m));
   })(),
   allowedModules: [...BASE_ALLOWED, ...list('EXTRA_ALLOWED_MODULES', [])],
