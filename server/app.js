@@ -22,8 +22,9 @@ import { execute } from './executor.js';
 import { createRun, getRun } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
 import { allowlist, installPackage } from './packages.js';
-import { listFiles, readFile, writeFile, deleteFile, safePath, ensureWorkspace, limitBytes, totalSize } from './files.js';
+import { listFiles, readFile, writeFile, deleteFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
 import { diagnostics } from './diag.js';
+import { identify, touch, startSweeper, perUserLimitBytes } from './spaces.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -233,6 +234,8 @@ const server = http.createServer(async (req, res) => {
         packages: config.allowPackageInstall,
         files: config.allowFileAccess,
         workspace_mb: config.workspaceMaxMb,
+        spaces: true,
+        space_ttl_hours: Math.round(config.spaceTtlMs / 3600000),
         timeout_ms: config.timeoutMs,
         run_idle_ms: config.runIdleMs,
         run_max_ms: config.runMaxMs,
@@ -243,7 +246,7 @@ const server = http.createServer(async (req, res) => {
 
     // ---- self-check ----
     if (req.method === 'GET' && url.pathname === '/api/diag') {
-      return json(res, 200, await diagnostics());
+      return json(res, 200, await diagnostics(req));
     }
 
     // ---- packages ----
@@ -280,6 +283,8 @@ const server = http.createServer(async (req, res) => {
       if (!verdict.ok) {
         return json(res, 400, { status: 'rejected', error: `Error: ${verdict.reason}` });
       }
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { status: 'error', error: 'No space for this visitor.' });
       try {
         await acquireSlot();
       } catch {
@@ -289,9 +294,10 @@ const server = http.createServer(async (req, res) => {
         });
       }
       try {
-        return json(res, 200, await execute({ code, stdin }));
+        return json(res, 200, await execute({ code, stdin, cwd: space.dir }));
       } finally {
         releaseSlot();
+        touch(space.dir);
       }
     }
 
@@ -319,6 +325,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { status: 'error', error: 'No space for this visitor.' });
+
       try {
         await acquireSlot();
       } catch {
@@ -330,12 +339,13 @@ const server = http.createServer(async (req, res) => {
 
       let run;
       try {
-        run = await createRun(resolved.code, resolved.opts);
+        run = await createRun(resolved.code, { ...resolved.opts, cwd: space.dir });
       } catch {
         releaseSlot();
         return json(res, 500, { status: 'error', error: 'Could not start the run.' });
       }
       run.done.then(() => releaseSlot());
+      touch(space.dir);
       if (stdin) run.write(stdin.endsWith('\n') ? stdin : `${stdin}\n`);
       return json(res, 200, { runId: run.id, mode: resolved.mode });
     }
@@ -394,37 +404,52 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
-    // ---- workspace files ----
+    // ---- workspace files (scoped to the caller's own space) ----
     if (req.method === 'GET' && url.pathname === '/api/files') {
-      return json(res, 200, await listFiles());
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { ok: false, error: 'No space for this visitor.' });
+      const info = await listFiles(space.dir);
+      touch(space.dir);
+      return json(res, 200, info);
     }
     if (req.method === 'POST' && url.pathname === '/api/files') {
       if (isRateLimited(clientIp(req))) {
         return json(res, 429, { ok: false, error: 'Too many requests, please slow down.' });
       }
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { ok: false, error: 'No space for this visitor.' });
       const name = url.searchParams.get('name') || '';
-      if (!safePath(name)) return json(res, 400, { ok: false, error: 'Invalid file name.' });
-      const used = await totalSize();
-      const cap = Math.min(limitBytes() - used, Math.round(config.maxUploadMb) * 1024 * 1024);
+      if (!safePath(space.dir, name)) return json(res, 400, { ok: false, error: 'Invalid file name.' });
+      const used = await dirSize(space.dir);
+      const cap = Math.min(
+        perUserLimitBytes() - used,
+        globalLimitBytes() - (await globalTotal()),
+        Math.round(config.maxUploadMb) * 1024 * 1024,
+      );
       if (cap <= 0) {
-        return json(res, 413, { ok: false, error: 'The workspace is full.' });
+        return json(res, 413, { ok: false, error: 'No space left for this upload.' });
       }
-      const result = await writeFile(name, req, cap);
+      const result = await writeFile(space.dir, name, req, cap);
+      touch(space.dir);
       return json(res, result.ok ? 200 : 413, result);
     }
     const fileMatch = url.pathname.match(/^\/api\/files\/(.+)$/);
     if (fileMatch && (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE')) {
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { ok: false, error: 'No space for this visitor.' });
       const name = decodeURIComponent(fileMatch[1]);
       if (req.method === 'DELETE') {
-        const ok = await deleteFile(name);
+        const ok = await deleteFile(space.dir, name);
+        touch(space.dir);
         return json(res, ok ? 200 : 404, { ok });
       }
-      const f = await readFile(name);
+      const f = await readFile(space.dir, name);
       if (!f) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS });
         res.end('Not found');
         return undefined;
       }
+      touch(space.dir);
       res.writeHead(200, {
         'Content-Type': 'application/octet-stream',
         'Content-Length': f.data.length,
@@ -442,15 +467,15 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(405, { Allow: 'GET, POST', ...SECURITY_HEADERS });
     res.end('Method not allowed');
     return undefined;
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('request failed:', err && err.stack ? err.stack : err);
     return json(res, 500, { status: 'error', error: 'Internal server error.' });
   }
 });
 
-ensureWorkspace().catch(() => {
-  // eslint-disable-next-line no-console
-  console.warn('Could not create the workspace directory:', config.workspaceDir);
-});
+fs.mkdir(config.workspaceDir, { recursive: true }).catch(() => {});
+startSweeper();
 
 server.listen(config.port, config.host, () => {
   // eslint-disable-next-line no-console

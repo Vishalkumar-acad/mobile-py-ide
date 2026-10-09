@@ -120,7 +120,7 @@ The console has three modes:
 
 ## Workspace and files
 
-Programs run with a **workspace** directory as their working directory, so a
+Programs run with a **space** directory as their working directory, so a
 relative path is saved and is still there next run:
 
 ```python
@@ -128,10 +128,38 @@ with open("notes.txt", "w") as f:
     f.write("saved for later")
 ```
 
-Tap **Files** in the IDE to list, upload, download and delete those files. The
-panel shows space used against `WORKSPACE_MAX_MB`.
+### Anonymous, per-visitor spaces
 
-Writes are confined to the workspace: the systemd sandbox keeps the rest of the
+There are no accounts. On first contact the server gives each browser a random
+id inside a **signed, HttpOnly cookie**, and that id names a folder under
+`WORKSPACE_DIR`. Files, downloads and runs are all scoped to it, so one visitor
+can never see, download or delete another's files — a forged or missing cookie
+gets a fresh, empty space.
+
+Tap **Files** in the IDE to list, upload, download and delete your own files.
+
+Two consequences worth knowing:
+
+- Clearing the browser's cookies loses the space, and a different browser or
+device gets a different one.
+- "Anonymous" means *isolated between users*, not *hidden from the operator*.
+  You own the server, so you can read every folder. Do not treat it as a vault.
+
+### Limits and cleanup
+
+| | Default | Setting |
+| --- | --- | --- |
+| One space | 512 MB | `PER_USER_MAX_MB` |
+| All spaces together | 10 GB | `WORKSPACE_MAX_MB` |
+| One file written by a program | 256 MB | `MAX_FILE_MB` |
+| One upload from the browser | 256 MB | `MAX_UPLOAD_MB` |
+| Idle before a space is deleted | 24 hours | `SPACE_TTL_MS` |
+
+A sweeper runs every `SWEEP_INTERVAL_MS` (10 minutes) and deletes spaces that
+have not been used within the TTL. Set `COOKIE_SECRET` to pin the signing
+secret; otherwise one is generated and kept in `WORKSPACE_DIR/.secret`.
+
+Writes are confined to the space: the systemd sandbox keeps the rest of the
 filesystem read-only, so a wrong path cannot damage anything. Reads elsewhere
 are still possible (the sandbox does not restrict reading), which is fine on a
 personal server. Set `ALLOW_FILE_ACCESS=false` to go back to blocking
@@ -157,11 +185,14 @@ Copy `.env.example` to `.env` and edit. Highlights:
 | `ALLOW_PACKAGE_INSTALL` | `true` | Allow allow-listed pip installs from the IDE |
 | `EXTRA_PACKAGES` | – | Extra package names to allow |
 | `ALLOW_TERMINAL` | `false` | Enable the shell (terminal) mode |
-| `WORKSPACE_DIR` | `<app>/workspace` | Where program files are kept |
+| `WORKSPACE_DIR` | `<app>/workspace` | Where spaces are kept |
 | `ALLOW_FILE_ACCESS` | `true` | Allow `open()`/`os` for workspace file work |
+| `PER_USER_MAX_MB` | `512` | Per-visitor space limit |
 | `MAX_FILE_MB` | `256` | Largest single file a program may write |
-| `WORKSPACE_MAX_MB` | `10240` | Workspace size limit (10 GB) |
+| `WORKSPACE_MAX_MB` | `10240` | All spaces together (10 GB) |
 | `MAX_UPLOAD_MB` | `256` | Largest upload from the browser |
+| `SPACE_TTL_MS` | `86400000` | Idle time before a space is deleted (24h) |
+| `COOKIE_SECRET` | – | Pin the cookie-signing secret |
 | `STRICT_MODE` | `false` | `true` = only allow-listed modules may be imported |
 | `UNBLOCK_MODULES` | – | Remove names from the built-in blocked list |
 | `DISABLE_NETWORK` | `false` | Wrap the runner in `unshare -n` (needs root or userns) |
@@ -320,8 +351,11 @@ curl -s localhost:3000/api/run \
   and resource limits raise the bar a lot; if you ever expose it publicly, also
   run the runner as a dedicated low-privilege user and consider a container or
   VM per execution.
-- `open()` and `os` are allowed for the workspace, so programs can read and
-  write files there. They cannot write outside it.
+- `open()` and `os` are allowed for a visitor's own space, so programs can
+  read and write files there. They cannot write outside it, and one visitor
+  cannot reach another's space.
+- Spaces are anonymous, not private from you: as the operator you can read every
+  folder. They are isolated between users and deleted after 24h idle.
 - Terminal mode is remote shell access. It is off by default; enable it only
   behind Cloudflare Access. It runs as the unprivileged service user inside the
   systemd sandbox, so it cannot use `sudo` or write outside the venv and `/tmp`.

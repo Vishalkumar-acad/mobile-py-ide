@@ -56,6 +56,7 @@ let runId = null;
 let outputEmpty = true;
 let mode = 'script';
 let receivedEvents = false;
+let spaceTtlHours = 24;
 
 /* ----------------------------- editor -------------------------------- */
 function loadStored(key, def) {
@@ -506,7 +507,7 @@ async function loadFiles() {
     });
     const total = document.createElement('div');
     total.className = 'file-total';
-    total.textContent = `${d.files.length} file(s) · ${fmtSize(d.total)} of ${fmtSize(d.limit)} used`;
+    total.textContent = `${d.files.length} file(s) · ${fmtSize(d.total)} of ${fmtSize(d.limit)} used · this space is yours alone and clears after ~${spaceTtlHours}h idle`;
     fileList.appendChild(total);
   } catch {
     /* ignore */
@@ -556,6 +557,7 @@ uploadBtn.addEventListener('click', uploadFiles);
     }
     if (h.packages) pkgBtn.hidden = false;
     if (h.files) filesBtn.hidden = false;
+    if (h.space_ttl_hours) spaceTtlHours = h.space_ttl_hours;
   } catch { /* offline: keep the defaults */ }
 })();
 

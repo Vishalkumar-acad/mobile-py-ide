@@ -115,6 +115,14 @@ const config = {
   workspaceMaxMb: num('WORKSPACE_MAX_MB', 10240),
   maxUploadMb: num('MAX_UPLOAD_MB', 256),
 
+  // Anonymous per-visitor spaces. Each browser gets a random id in a signed
+  // cookie and its own folder; nobody can see anyone else's files.
+  spaceTtlMs: num('SPACE_TTL_MS', 24 * 60 * 60 * 1000), // 24h of inactivity
+  perUserMaxMb: num('PER_USER_MAX_MB', 512),
+  sweepIntervalMs: num('SWEEP_INTERVAL_MS', 10 * 60 * 1000),
+  cookieName: process.env.COOKIE_NAME || 'pypad_id',
+  cookieSecret: process.env.COOKIE_SECRET || '',
+
   // Sandbox hardening
   // DISABLE_NETWORK needs either root or working user-namespaces (see README).
   disableNetwork: bool('DISABLE_NETWORK', false),

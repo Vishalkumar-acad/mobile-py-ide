@@ -45,7 +45,7 @@ function buildCommand({ filePath, kind, memoryMb, maxMs }) {
 /**
  * Start a program.
  * @param {string} code
- * @param {{idleMs?: number, maxMs?: number, kind?: 'python'|'bash', memoryMb?: number}} [opts]
+ * @param {{idleMs?: number, maxMs?: number, kind?: 'python'|'bash', memoryMb?: number, cwd?: string}} [opts]
  * @returns {Promise<object>} a Run handle
  */
 export async function createRun(code, opts = {}) {
@@ -53,12 +53,13 @@ export async function createRun(code, opts = {}) {
   const maxMs = opts.maxMs ?? config.runMaxMs;
   const kind = opts.kind === 'bash' ? 'bash' : 'python';
   const memoryMb = opts.memoryMb ?? config.memoryLimitMb;
+  const workDir = opts.cwd || config.workspaceDir;
 
   const id = crypto.randomBytes(9).toString('hex');
-  // The workspace is the working directory, so files written with a relative
-  // path survive between runs. Scratch files (and the .py itself) go in a temp
-  // dir that is removed afterwards.
-  await mkdir(config.workspaceDir, { recursive: true }).catch(() => {});
+  // The caller's space is the working directory, so files written with a
+  // relative path land there and survive between runs. Scratch files (and the
+  // .py itself) go in a temp dir that is removed afterwards.
+  await mkdir(workDir, { recursive: true }).catch(() => {});
   const dir = await mkdtemp(path.join(tmpdir(), 'mobi-py-'));
   let file = null;
   if (kind === 'python') {
@@ -194,7 +195,7 @@ export async function createRun(code, opts = {}) {
     PATH: '/usr/local/bin:/usr/bin:/bin',
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
-    HOME: config.workspaceDir,
+    HOME: workDir,
     TMPDIR: dir,
     PYTHONIOENCODING: 'utf-8',
     PYTHONDONTWRITEBYTECODE: '1',
@@ -208,7 +209,7 @@ export async function createRun(code, opts = {}) {
 
   try {
     run.child = spawn('bash', argv, {
-      cwd: config.workspaceDir,
+      cwd: workDir,
       env,
       detached: true,
       uid: config.runAsUid,

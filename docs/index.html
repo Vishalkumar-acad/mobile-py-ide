@@ -155,9 +155,13 @@ print("Hello,", name, "!")</code></pre>
 # next run:
 print(open("notes.txt").read())</code></pre>
 <p>Tap <strong>Files</strong> in the top bar to see everything in the workspace, download a file, upload one, or delete one. The line at the bottom shows how much space is used out of the limit.</p>
-<p>Writes are confined to that folder — the rest of the server is read-only to your programs, so a wrong path cannot damage anything. <code>os</code> and <code>open()</code> are available for this; the process calls inside <code>os</code> (<code>system</code>, <code>popen</code>, <code>exec*</code>, <code>fork</code>) are not.</p>
+<div class="card ok">
+  <strong>Your own space — no account needed.</strong> The first time you open PyPad, the server gives this browser a random anonymous id, and everything you save lives in a folder that only that id can reach. You cannot see anyone else's files and they cannot see yours. There is no password to remember — but that also means: if you clear the browser's cookies you lose the space, and a different browser or device gets a different one.
+</div>
+<p>Spaces clean themselves up: one that has not been used for about 24 hours is deleted from the server.</p>
+<p>Writes are confined to your space — the rest of the server is read-only to your programs, so a wrong path cannot damage anything. <code>os</code> and <code>open()</code> are available for this; the process calls inside <code>os</code> (<code>system</code>, <code>popen</code>, <code>exec*</code>, <code>fork</code>) are not.</p>
 <div class="card note">
-  <strong>Space.</strong> The workspace is limited — 10 GB by default. Uploads beyond it are refused, and a single file written by a program is capped at <code>MAX_FILE_MB</code> (256 MB by default). Raise either on the server with <code>WORKSPACE_MAX_MB</code> and <code>MAX_FILE_MB</code>.
+  <strong>Space.</strong> Each space is capped (512 MB by default) and all spaces together share one pool of 10 GB. Uploads beyond either are refused, and a single file written by a program is capped at <code>MAX_FILE_MB</code> (256 MB by default). Adjust with <code>PER_USER_MAX_MB</code>, <code>WORKSPACE_MAX_MB</code> and <code>MAX_FILE_MB</code>.
 </div>
 
 <h2 id="blocked">What is blocked, and why</h2>

@@ -1,6 +1,7 @@
 // Dependency-free test suite: `npm test` (or `node test/run-tests.js`).
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { validate } from '../server/validator.js';
 import { execute } from '../server/executor.js';
@@ -8,6 +9,9 @@ import { createRun } from '../server/runs.js';
 import { REPL_SOURCE } from '../server/modes.js';
 import { isAllowed } from '../server/packages.js';
 import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
+import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
+
+const BASE = spaceDir('f'.repeat(32));
 
 let passed = 0;
 let failed = 0;
@@ -215,25 +219,51 @@ check('refuses an unknown name', () => assert.equal(isAllowed('definitely-not-a-
 
 console.log('\nWorkspace files');
 check('rejects path traversal and absolute names', () => {
-  assert.equal(safePath('../x'), null);
-  assert.equal(safePath('a/../b'), null);
-  assert.equal(safePath('/etc/passwd'), null);
-  assert.equal(safePath(''), null);
-  assert.notEqual(safePath('notes.txt'), null);
-  assert.notEqual(safePath('data/report.txt'), null);
+  assert.equal(safePath(BASE, '../x'), null);
+  assert.equal(safePath(BASE, 'a/../b'), null);
+  assert.equal(safePath(BASE, '/etc/passwd'), null);
+  assert.equal(safePath(BASE, ''), null);
+  assert.notEqual(safePath(BASE, 'notes.txt'), null);
+  assert.notEqual(safePath(BASE, 'data/report.txt'), null);
 });
 await checkAsync('writes and reads a file back', async () => {
-  const w = await writeFile('test-roundtrip.txt', Readable.from([Buffer.from('hello')]), 1024);
+  const w = await writeFile(BASE, 'test-roundtrip.txt', Readable.from([Buffer.from('hello')]), 1024);
   assert.equal(w.ok, true);
-  const f = await readFile('test-roundtrip.txt');
+  const f = await readFile(BASE, 'test-roundtrip.txt');
   assert.equal(f.data.toString(), 'hello');
-  assert.equal(await deleteFile('test-roundtrip.txt'), true);
-  assert.equal(await readFile('test-roundtrip.txt'), null);
+  assert.equal(await deleteFile(BASE, 'test-roundtrip.txt'), true);
+  assert.equal(await readFile(BASE, 'test-roundtrip.txt'), null);
 });
 await checkAsync('refuses a file over the size cap', async () => {
-  const w = await writeFile('too-big.txt', Readable.from([Buffer.alloc(4096)]), 1024);
+  const w = await writeFile(BASE, 'too-big.txt', Readable.from([Buffer.alloc(4096)]), 1024);
   assert.equal(w.ok, false);
-  assert.equal(await readFile('too-big.txt'), null);
+  assert.equal(await readFile(BASE, 'too-big.txt'), null);
+});
+await checkAsync('deleting a file that is not there returns false', async () => {
+  assert.equal(await deleteFile(BASE, 'never-existed.txt'), false);
+});
+await fs.rm(BASE, { recursive: true, force: true }).catch(() => {});
+
+console.log('\nSpaces (per-visitor isolation)');
+await checkAsync('tokens round-trip and forgeries are rejected', async () => {
+  const id = 'a'.repeat(32);
+  assert.equal(await readToken(await makeToken(id)), id);
+  assert.equal(await readToken(`${id}.wrongsignature00000000`), null);
+  assert.equal(await readToken('not-a-token'), null);
+  assert.equal(await readToken(undefined), null);
+  assert.equal(await readToken('short.abc'), null);
+});
+await checkAsync('the sweeper removes an idle space but keeps a fresh one', async () => {
+  const idle = spaceDir('b'.repeat(32));
+  const fresh = spaceDir('c'.repeat(32));
+  await fs.mkdir(idle, { recursive: true });
+  await fs.mkdir(fresh, { recursive: true });
+  const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  await fs.utimes(idle, old, old);
+  await sweep();
+  assert.equal(await fs.stat(idle).then(() => true).catch(() => false), false);
+  assert.equal(await fs.stat(fresh).then(() => true).catch(() => false), true);
+  await fs.rm(fresh, { recursive: true, force: true });
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

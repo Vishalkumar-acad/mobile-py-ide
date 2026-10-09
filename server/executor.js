@@ -19,8 +19,8 @@ const STATUS_MAP = {
  * @param {{code: string, stdin?: string}} params
  * @returns {Promise<object>}
  */
-export async function execute({ code, stdin = '' }) {
-  const run = await createRun(code, { idleMs: config.timeoutMs, maxMs: config.timeoutMs });
+export async function execute({ code, stdin = '', cwd }) {
+  const run = await createRun(code, { idleMs: config.timeoutMs, maxMs: config.timeoutMs, cwd });
   if (stdin) run.write(stdin.endsWith('\n') ? stdin : `${stdin}\n`);
   run.endInput();
 
