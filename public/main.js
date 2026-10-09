@@ -32,12 +32,20 @@ const sendBtn = $('#sendBtn');
 const prefillDetails = $('#prefillDetails');
 const prefillCount = $('#prefillCount');
 const prefillClear = $('#prefillClear');
+const modebar = $('#modebar');
+const pkgBtn = $('#pkgBtn');
+const pkgDialog = $('#pkgDialog');
+const pkgInput = $('#pkgInput');
+const pkgInstall = $('#pkgInstall');
+const pkgOut = $('#pkgOut');
+const pkgAllowed = $('#pkgAllowed');
 
 let cmView = null;
 let usingCM = false;
 let es = null;
 let runId = null;
 let outputEmpty = true;
+let mode = 'script';
 
 /* ----------------------------- editor -------------------------------- */
 function loadStored(key, def) {
@@ -201,17 +209,20 @@ async function startRun() {
   runBtn.disabled = true;
 
   const code = getCode();
-  let prefill = stdinEl.value;
+  let prefill = mode === 'script' ? stdinEl.value : '';
 
-  if (prefill.trim() && looksLikePastedCode(code, prefill)) {
+  if (mode === 'script' && prefill.trim() && looksLikePastedCode(code, prefill)) {
     prefill = '';
     stdinEl.value = '';
     try { localStorage.removeItem(STORAGE_STDIN); } catch { /* ignore */ }
     updatePrefillUI();
     appendOutput('⚠ The Pre-fill input box held your program code, so it was not sent.\n', 'muted');
-  } else if (prefill.trim()) {
+  } else if (mode === 'script' && prefill.trim()) {
     for (const line of prefill.split('\n')) appendOutput(line + '\n', 'echo');
   }
+
+  if (mode === 'repl') appendOutput('Python REPL — type an expression and press Enter.\n', 'muted');
+  if (mode === 'terminal') appendOutput('Terminal — type a shell command and press Enter.\n', 'muted');
 
   if (!window.EventSource) return startRunLegacy(code, prefill);
 
@@ -220,7 +231,7 @@ async function startRun() {
     const res = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, stdin: prefill }),
+      body: JSON.stringify({ code, stdin: prefill, mode }),
     });
     data = await res.json();
     if (!res.ok || !data.runId) {
@@ -309,7 +320,7 @@ inputForm.addEventListener('submit', async (e) => {
   if (!runId) return;
   const value = inputLine.value;
   inputLine.value = '';
-  appendOutput(value + '\n', 'echo');
+  appendOutput((mode === 'terminal' ? '$ ' : '') + value + '\n', 'echo');
   try {
     await fetch(`/api/runs/${runId}/input`, {
       method: 'POST',
@@ -350,4 +361,81 @@ prefillClear.addEventListener('click', () => {
 updatePrefillUI();
 initEditor();
 
-window.mobiPy = { startRun, stopRun, getCode, setCode };
+/* --------------------------- modes ----------------------------------- */
+function setMode(next) {
+  if (mode === next) return;
+  mode = next;
+  document.querySelectorAll('.modebar .mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === next));
+  document.querySelector('.console-input .prompt').textContent = next === 'terminal' ? '$' : '›';
+  prefillDetails.hidden = next !== 'script';
+  switchTab('console');
+  clearOutput();
+  const hint = next === 'script' ? 'Press ▶ Run to execute your code.'
+    : next === 'repl' ? 'Press ▶ Run to start a Python REPL, then type below.'
+      : 'Press ▶ Run to open a terminal, then type commands below.';
+  appendOutput(hint, 'muted');
+  setStatus('', '');
+}
+modebar.addEventListener('click', (e) => {
+  const b = e.target.closest('.mode');
+  if (b && !b.hidden) setMode(b.dataset.mode);
+});
+
+/* ------------------------- packages dialog --------------------------- */
+async function openPackages() {
+  pkgOut.hidden = true;
+  pkgOut.textContent = '';
+  if (typeof pkgDialog.showModal === 'function') pkgDialog.showModal();
+  else pkgDialog.setAttribute('open', '');
+  try {
+    const res = await fetch('/api/packages');
+    const d = await res.json();
+    pkgAllowed.textContent = '';
+    (d.allowlist || []).forEach((name) => {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'chip';
+      c.textContent = name;
+      c.addEventListener('click', () => { pkgInput.value = name; pkgInput.focus(); });
+      pkgAllowed.appendChild(c);
+    });
+  } catch { /* ignore */ }
+}
+async function installPackage() {
+  const name = pkgInput.value.trim();
+  if (!name) return;
+  pkgInstall.disabled = true;
+  pkgOut.hidden = false;
+  pkgOut.textContent = `Installing ${name}…`;
+  try {
+    const res = await fetch('/api/packages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const d = await res.json();
+    pkgOut.textContent = (d.ok ? `✓ ${name} installed.\n\n` : `✗ ${d.error || 'failed'}\n\n`) + (d.output || '');
+  } catch (err) {
+    pkgOut.textContent = 'Network error: ' + err.message;
+  } finally {
+    pkgInstall.disabled = false;
+  }
+}
+pkgBtn.addEventListener('click', openPackages);
+pkgInstall.addEventListener('click', installPackage);
+pkgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); installPackage(); } });
+
+/* --------------------------- capabilities ---------------------------- */
+(async () => {
+  try {
+    const res = await fetch('/api/health');
+    const h = await res.json();
+    if (h.terminal) {
+      const t = modebar.querySelector('[data-mode="terminal"]');
+      if (t) t.hidden = false;
+    }
+    if (h.packages) pkgBtn.hidden = false;
+  } catch { /* offline: keep the defaults */ }
+})();
+
+window.mobiPy = { startRun, stopRun, getCode, setCode, setMode };

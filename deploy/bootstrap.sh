@@ -99,15 +99,25 @@ MEMORY_LIMIT_MB=128
 MAX_CONCURRENT_RUNS=2
 MAX_QUEUE=8
 STRICT_MODE=false
+ALLOW_PACKAGE_INSTALL=true
+ALLOW_TERMINAL=false
 PYTHON_BIN=${VENV_PY}
 EOF
 else
   log "$APP_DIR/.env already exists, leaving it untouched"
-  if ! grep -q '^PYTHON_BIN=' "$APP_DIR/.env"; then
-    echo "PYTHON_BIN=${VENV_PY}" >> "$APP_DIR/.env"
-    log "Added PYTHON_BIN=${VENV_PY} to the existing .env"
-  fi
 fi
+
+# Add any setting the file is missing (safe to run repeatedly).
+ensure_env() {
+  local key="$1" val="$2"
+  grep -q "^${key}=" "$APP_DIR/.env" || {
+    echo "${key}=${val}" >> "$APP_DIR/.env"
+    log "Added ${key}=${val} to .env"
+  }
+}
+ensure_env PYTHON_BIN "$VENV_PY"
+ensure_env ALLOW_PACKAGE_INSTALL "true"
+ensure_env ALLOW_TERMINAL "false"
 chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
 
 # --- 6. systemd service -------------------------------------------------
@@ -132,12 +142,12 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/tmp
+ReadWritePaths=/tmp ${APP_DIR}/venv
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-MemoryMax=512M
+MemoryMax=1024M
 TasksMax=64
 
 [Install]

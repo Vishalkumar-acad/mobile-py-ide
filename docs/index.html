@@ -61,6 +61,7 @@
   <nav class="toc">
     <a href="#start">Getting started</a>
     <a href="#screen">The screen</a>
+    <a href="#modes">Modes</a>
     <a href="#input">Input &amp; output</a>
     <a href="#libraries">Libraries</a>
     <a href="#packages">Installing packages</a>
@@ -96,6 +97,18 @@
 </figure>
 <p>Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or <kbd>Cmd</kbd>+<kbd>Enter</kbd>) to run without reaching for the button. Your code is saved in the browser automatically, so it is still there when you come back.</p>
 
+<h2 id="modes">Modes</h2>
+<p>The console has three modes, chosen with the buttons at the top of the Console tab.</p>
+<table>
+  <tr><th>Mode</th><th>What it does</th></tr>
+  <tr><td><strong>Script</strong></td><td>Runs the code in the editor. This is the normal mode.</td></tr>
+  <tr><td><strong>REPL</strong></td><td>An interactive Python prompt. Press Run to start it, then type one line at a time below and see each result immediately — just like Python's <code>&gt;&gt;&gt;</code> prompt. Variables you set stay available for the next line.</td></tr>
+  <tr><td><strong>Terminal</strong></td><td>A shell on the server. Type a command, press Enter, read its output. Only shown if it has been enabled.</td></tr>
+</table>
+<div class="card warn">
+  <strong>About the terminal.</strong> Terminal mode is a real shell on the server, so it is <em>off by default</em>. It is only safe while the IDE stays private (for example behind Cloudflare Access). To turn it on, add <code>ALLOW_TERMINAL=true</code> to <code>/opt/mobile-py-ide/.env</code> and restart the service; set it back to <code>false</code> to turn it off.
+</div>
+
 <h2 id="input">Input &amp; output</h2>
 <p>This IDE has a <strong>live console</strong>. When your program calls <code>input()</code>, it prints its prompt, pauses, and waits — then you type into the <strong>›</strong> line at the bottom of the console and press <kbd>Enter</kbd>. The program continues. You can do this as many times as it asks.</p>
 <pre><code>name = input("What is your name? ")
@@ -120,14 +133,18 @@ print("Hello,", name, "!")</code></pre>
 </table>
 
 <h2 id="packages">Installing packages</h2>
-<p>The runner uses its own virtual environment on the server, so installing a package there makes it importable in the IDE. On the server, run:</p>
+<p>Tap <strong>Packages</strong> in the top bar. You get a box to type a package name, the list of everything that is allowed, and the live pip output.</p>
+<ol>
+  <li>Open <strong>Packages</strong>.</li>
+  <li>Type a name — or tap one of the chips, which are exactly the allowed ones.</li>
+  <li>Press <strong>Install</strong>. When it finishes, <code>import</code> that package in your code.</li>
+</ol>
+<p>Only light, well-known packages can be installed. Heavy libraries — <code>torch</code>, <code>tensorflow</code>, <code>pandas</code>, <code>scipy</code> and friends — are refused, because they do not fit a small server and the whole point is to keep it quick.</p>
+<p>Want one that is not on the list? Add it to <code>EXTRA_PACKAGES</code> in <code>.env</code> on the server, or install from a shell:</p>
 <pre><code>sudo bash deploy/add-packages.sh rich tabulate</code></pre>
-<p>Then <code>import rich</code> works in your programs. That is how "pip install" works here — one command on the server, available to every run afterwards.</p>
 <div class="card note">
-  <strong>Why not pip from the IDE itself?</strong> Letting a web page install arbitrary code onto the server is a big security hole, and on a small server a heavy package can fill the disk or the memory. Installing deliberately, from a shell you control, keeps the box safe.
+  <strong>Why not pip from anywhere?</strong> Letting a web page install arbitrary code onto the server is a security hole, and a heavy package can fill the disk or the memory. So installation is limited to a reviewed list, and it runs with a memory cap and a timeout.
 </div>
-<p>If you install something that the validator blocks by name, unblock it in <code>.env</code>:</p>
-<pre><code>UNBLOCK_MODULES=pandas</code></pre>
 
 <h2 id="blocked">What is blocked, and why</h2>
 <p>Before anything runs, the server checks the code and refuses a few things:</p>
@@ -148,6 +165,8 @@ print("Hello,", name, "!")</code></pre>
   <tr><td>Status: <em>Time limit reached</em></td><td>The run hit the 2-minute cap.</td></tr>
   <tr><td><code>Error: importing 'os' is not allowed</code></td><td>The checker blocked a module. See the list above.</td></tr>
   <tr><td><em>Server is busy…</em></td><td>Two programs were already running. Wait a moment and press Run again.</td></tr>
+  <tr><td><em>Terminal mode is turned off</em></td><td>Terminal mode is opt-in for safety. See the note in <a href="#modes">Modes</a>.</td></tr>
+  <tr><td><em>not on the allowed list</em></td><td>That package is not in the reviewed set. Use one of the chips, or add it to <code>EXTRA_PACKAGES</code> on the server.</td></tr>
 </table>
 
 <h2 id="api">API</h2>
@@ -155,10 +174,12 @@ print("Hello,", name, "!")</code></pre>
   <tr><th>Method &amp; path</th><th>Purpose</th></tr>
   <tr><td><code>GET /api/health</code></td><td>Service status and limits.</td></tr>
   <tr><td><code>POST /api/run</code></td><td>One-shot: send <code>{code, stdin}</code>, get the full result as JSON.</td></tr>
-  <tr><td><code>POST /api/runs</code></td><td>Start an interactive run; returns <code>{runId}</code>.</td></tr>
+  <tr><td><code>POST /api/runs</code></td><td>Start a run; body <code>{code, stdin?, mode}</code> where mode is <code>script</code>, <code>repl</code> or <code>terminal</code>. Returns <code>{runId}</code>.</td></tr>
   <tr><td><code>GET /api/runs/:id/events</code></td><td>Server-Sent Events stream of output and the final exit.</td></tr>
   <tr><td><code>POST /api/runs/:id/input</code></td><td>Send <code>{data}</code> to the running program.</td></tr>
   <tr><td><code>POST /api/runs/:id/kill</code></td><td>Stop the run.</td></tr>
+  <tr><td><code>GET /api/packages</code></td><td>The allowed package list.</td></tr>
+  <tr><td><code>POST /api/packages</code></td><td>Install <code>{name}</code> from the allow-list.</td></tr>
 </table>
 <pre><code>curl -s localhost:3000/api/run \
   -H 'Content-Type: application/json' \

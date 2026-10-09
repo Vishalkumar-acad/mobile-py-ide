@@ -44,9 +44,20 @@ const BASE_ALLOWED = [
   'itertools', 'functools', 'operator', 'collections', 'heapq', 'bisect',
   'copy', 'array', 'struct', 'enum', 'dataclasses', 'typing', 'abc',
   'contextlib', 'warnings', 'traceback', 'uuid', 'hashlib', 'hmac', 'base64',
-  'binascii', 'unicodedata', 'secrets', 'io', 'sys',
+  'binascii', 'unicodedata', 'secrets', 'io', 'sys', 'code',
   // Light third-party libraries that are commonly pre-installed
   'numpy', 'requests',
+];
+
+// Light, popular packages that may be installed from the IDE. Heavy ones
+// (torch, pandas, ...) are deliberately absent.
+const BASE_PACKAGES = [
+  'requests', 'rich', 'tabulate', 'colorama', 'termcolor', 'pyfiglet', 'art',
+  'cowsay', 'emoji', 'tqdm', 'pytz', 'python-dateutil', 'six', 'attrs',
+  'click', 'typer', 'humanize', 'prettytable', 'texttable', 'pyyaml', 'toml',
+  'python-dotenv', 'more-itertools', 'sortedcontainers', 'faker', 'validators',
+  'markdown', 'jinja2', 'qrcode', 'names', 'wonderwords', 'halo',
+  'alive-progress', 'questionary', 'rich-argparse',
 ];
 
 const config = {
@@ -66,6 +77,21 @@ const config = {
   // output and no input, and hard-killed at the absolute cap.
   runIdleMs: num('RUN_IDLE_MS', 30000),
   runMaxMs: num('RUN_MAX_MS', 120000),
+
+  // REPL / terminal sessions stay open much longer (you are thinking).
+  replIdleMs: num('REPL_IDLE_MS', 300000),
+  replMaxMs: num('REPL_MAX_MS', 1800000),
+
+  // A real shell on the server. OFF by default: only enable it if the IDE is
+  // kept private (e.g. behind Cloudflare Access).
+  allowTerminal: bool('ALLOW_TERMINAL', false),
+  terminalMemoryMb: num('TERMINAL_MEMORY_MB', 512),
+
+  // Installing allow-listed packages from the IDE.
+  allowPackageInstall: bool('ALLOW_PACKAGE_INSTALL', true),
+  packageMemoryMb: num('PACKAGE_MEMORY_MB', 768),
+  packageTimeoutMs: num('PACKAGE_TIMEOUT_MS', 120000),
+  packageAllowlist: [...BASE_PACKAGES, ...list('EXTRA_PACKAGES', [])],
 
   // Sandbox hardening
   // DISABLE_NETWORK needs either root or working user-namespaces (see README).

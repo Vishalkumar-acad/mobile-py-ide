@@ -1,10 +1,8 @@
-// Interactive, streaming Python run engine.
+// Interactive, streaming run engine.
 //
-// Unlike a one-shot subprocess, a Run stays alive so the browser can stream
-// its output and feed stdin while it is running — that is what makes input()
-// work like a real terminal. Runs are resource-limited the same way as
-// before (CPU, virtual memory, wall-clock, output cap) and are always
-// cleaned up, no matter how they end.
+// A Run stays alive so the browser can stream its output and feed stdin while
+// it is running — that is what makes input() (and the REPL and terminal modes)
+// work like a real terminal. Runs are resource-limited and always cleaned up.
 
 import { spawn } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -24,30 +22,40 @@ export function activeRunCount() {
   return runs.size;
 }
 
-function buildCommand(filePath) {
-  const memKb = Math.max(16, Math.round(config.memoryLimitMb)) * 1024;
-  const cpuSec = Math.max(2, Math.ceil(config.runMaxMs / 1000) + 2);
-  // ulimit is best-effort: ignore failures so we still run on odd shells.
+// kind: 'python' runs the given code file; 'bash' starts a shell reading
+// commands from stdin (the terminal mode).
+function buildCommand({ filePath, kind, memoryMb, maxMs }) {
+  const memKb = Math.max(16, Math.round(memoryMb)) * 1024;
+  const cpuSec = Math.max(2, Math.ceil(maxMs / 1000) + 2);
   const limits = `ulimit -v ${memKb} 2>/dev/null; ulimit -t ${cpuSec} 2>/dev/null; ulimit -f 2048 2>/dev/null;`;
+
+  if (kind === 'bash') {
+    return `${limits} exec bash --noprofile --norc -s`;
+  }
   // -I isolated, -B no .pyc, -q quiet, -u unbuffered (so output streams live)
-  const run = `${config.disableNetwork ? 'unshare -n ' : 'exec '}${JSON.stringify(config.pythonBin)} -I -B -q -u "$1"`;
-  return `${limits} ${run}`;
+  const py = `${config.disableNetwork ? 'unshare -n ' : 'exec '}${JSON.stringify(config.pythonBin)} -I -B -q -u "$1"`;
+  return `${limits} ${py}`;
 }
 
 /**
- * Start a Python program.
+ * Start a program.
  * @param {string} code
- * @param {{idleMs?: number, maxMs?: number}} [opts]
+ * @param {{idleMs?: number, maxMs?: number, kind?: 'python'|'bash', memoryMb?: number}} [opts]
  * @returns {Promise<object>} a Run handle
  */
 export async function createRun(code, opts = {}) {
   const idleMs = opts.idleMs ?? config.runIdleMs;
   const maxMs = opts.maxMs ?? config.runMaxMs;
+  const kind = opts.kind === 'bash' ? 'bash' : 'python';
+  const memoryMb = opts.memoryMb ?? config.memoryLimitMb;
 
   const id = crypto.randomBytes(9).toString('hex');
   const dir = await mkdtemp(path.join(tmpdir(), 'mobi-py-'));
-  const file = path.join(dir, `exec_${crypto.randomBytes(6).toString('hex')}.py`);
-  await writeFile(file, code, 'utf8');
+  let file = null;
+  if (kind === 'python') {
+    file = path.join(dir, `exec_${crypto.randomBytes(6).toString('hex')}.py`);
+    await writeFile(file, code, 'utf8');
+  }
 
   const listeners = new Set();
   const log = [];
@@ -55,6 +63,7 @@ export async function createRun(code, opts = {}) {
   const run = {
     id,
     dir,
+    kind,
     startedAt: Date.now(),
     finished: false,
     truncated: false,
@@ -93,7 +102,6 @@ export async function createRun(code, opts = {}) {
     if (run.finished) return;
     run.stopReason = reason;
     killTree();
-    // Backstop: if 'close' never fires, finalise anyway.
     if (!safetyTimer) safetyTimer = setTimeout(finalize, 3000);
   }
 
@@ -169,10 +177,16 @@ export async function createRun(code, opts = {}) {
     TMPDIR: dir,
     PYTHONIOENCODING: 'utf-8',
     PYTHONDONTWRITEBYTECODE: '1',
+    TERM: 'dumb',
+    PS1: '',
   };
 
+  const argv = kind === 'bash'
+    ? ['-c', buildCommand({ kind, memoryMb, maxMs })]
+    : ['-c', buildCommand({ kind, memoryMb, maxMs, filePath: file }), 'mobi-py', file];
+
   try {
-    run.child = spawn('bash', ['-c', buildCommand(file), 'mobi-py', file], {
+    run.child = spawn('bash', argv, {
       cwd: dir,
       env,
       detached: true,

@@ -295,6 +295,92 @@ main {
 textarea, input { font-size: 16px; }
 .editor-fallback, .stdin-box, .console-input input { font-size: 15px; }
 
+/* ---------- console mode selector ---------- */
+.modebar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+.modebar .mode {
+  flex: 1;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.modebar .mode.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- packages dialog ---------- */
+.dialog {
+  width: min(560px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elev);
+  color: var(--text);
+  padding: 0 0 16px;
+  font-family: var(--sans);
+}
+.dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+.dialog-head h2 { margin: 0; font-size: 17px; }
+.dialog-note { margin: 12px 16px; font-size: 13px; color: var(--muted); }
+.pkg-row { display: flex; gap: 8px; padding: 0 16px; }
+.pkg-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0 12px;
+  font-family: var(--mono);
+  font-size: 15px;
+  outline: none;
+}
+.pkg-row input:focus { border-color: var(--accent); }
+.run-btn.small { height: 40px; min-width: 84px; font-size: 14px; }
+.pkg-allowed { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 16px 0; }
+.pkg-allowed .chip {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pkg-allowed .chip:hover { color: var(--text); border-color: var(--accent); }
+.pkg-out {
+  margin: 12px 16px 0;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ---------- desktop: editor and console side by side ---------- */
 @media (min-width: 860px) {
   .tabs { display: none; }

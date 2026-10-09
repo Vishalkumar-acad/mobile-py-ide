@@ -3,12 +3,14 @@
 // Zero npm dependencies: only Node's built-in modules. Serves the static
 // frontend from ../public and exposes:
 //
-//   GET  /api/health                    -> { ok, ... }
+//   GET  /api/health                    -> { ok, terminal, packages, ... }
 //   POST /api/run    { code, stdin }    -> one-shot execution result (JSON)
-//   POST /api/runs   { code, stdin? }   -> { runId }  (interactive run)
+//   POST /api/runs   { code, stdin?, mode } -> { runId }   mode: script|repl|terminal
 //   GET  /api/runs/:id/events           -> Server-Sent Events stream
 //   POST /api/runs/:id/input { data }   -> feed a line to the running program
 //   POST /api/runs/:id/kill             -> stop the running program
+//   GET  /api/packages                  -> allowed packages
+//   POST /api/packages { name }         -> install an allow-listed package
 
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -18,6 +20,8 @@ import config from './config.js';
 import { validate } from './validator.js';
 import { execute } from './executor.js';
 import { createRun, getRun } from './runs.js';
+import { REPL_SOURCE } from './modes.js';
+import { allowlist, installPackage } from './packages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, '..', 'public');
@@ -67,6 +71,26 @@ function readBody(req, limit) {
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
+}
+
+async function parseJsonBody(req, res, limit) {
+  let body;
+  try {
+    body = await readBody(req, limit);
+  } catch (e) {
+    const tooLarge = e.message === 'PAYLOAD_TOO_LARGE';
+    json(res, tooLarge ? 413 : 400, {
+      status: 'error',
+      error: tooLarge ? 'Request body too large.' : 'Could not read request body.',
+    });
+    return null;
+  }
+  try {
+    return JSON.parse(body || '{}');
+  } catch {
+    json(res, 400, { status: 'error', error: 'Invalid JSON body.' });
+    return null;
+  }
 }
 
 // --- tiny in-memory per-IP rate limiter ---------------------------------
@@ -153,42 +177,6 @@ async function serveStatic(req, res) {
   }
 }
 
-// --- shared request parsing --------------------------------------------
-async function parseRunBody(req, res) {
-  const limit = config.maxCodeBytes + config.maxStdinBytes + 8192;
-  let body;
-  try {
-    body = await readBody(req, limit);
-  } catch (e) {
-    const tooLarge = e.message === 'PAYLOAD_TOO_LARGE';
-    json(res, tooLarge ? 413 : 400, {
-      status: 'error',
-      error: tooLarge ? 'Request body too large.' : 'Could not read request body.',
-    });
-    return null;
-  }
-  let payload;
-  try {
-    payload = JSON.parse(body || '{}');
-  } catch {
-    json(res, 400, { status: 'error', error: 'Invalid JSON body.' });
-    return null;
-  }
-  const code = typeof payload.code === 'string' ? payload.code : '';
-  const stdin = typeof payload.stdin === 'string' ? payload.stdin : '';
-
-  if (Buffer.byteLength(stdin, 'utf8') > config.maxStdinBytes) {
-    json(res, 413, { status: 'error', error: 'stdin is too large.' });
-    return null;
-  }
-  const verdict = validate(code);
-  if (!verdict.ok) {
-    json(res, 400, { status: 'rejected', error: `Error: ${verdict.reason}` });
-    return null;
-  }
-  return { code, stdin };
-}
-
 function sseOpen(res) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -198,6 +186,34 @@ function sseOpen(res) {
     ...SECURITY_HEADERS,
   });
   res.write(': connected\n\n');
+}
+
+// Work out what to run for a given mode.
+function resolveMode(payload) {
+  const mode = ['script', 'repl', 'terminal'].includes(payload.mode) ? payload.mode : 'script';
+  if (mode === 'terminal') {
+    if (!config.allowTerminal) return { error: 'Terminal mode is turned off on this server.' };
+    return {
+      mode,
+      code: '',
+      opts: { kind: 'bash', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb },
+      skipValidation: true,
+    };
+  }
+  if (mode === 'repl') {
+    return {
+      mode,
+      code: REPL_SOURCE,
+      opts: { kind: 'python', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.memoryLimitMb },
+      skipValidation: true,
+    };
+  }
+  return {
+    mode: 'script',
+    code: typeof payload.code === 'string' ? payload.code : '',
+    opts: { kind: 'python', idleMs: config.runIdleMs, maxMs: config.runMaxMs, memoryMb: config.memoryLimitMb },
+    skipValidation: false,
+  };
 }
 
 // --- request routing ----------------------------------------------------
@@ -210,6 +226,9 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         service: 'mobile-py-ide',
         interactive: true,
+        modes: ['script', 'repl', ...(config.allowTerminal ? ['terminal'] : [])],
+        terminal: config.allowTerminal,
+        packages: config.allowPackageInstall,
         timeout_ms: config.timeoutMs,
         run_idle_ms: config.runIdleMs,
         run_max_ms: config.runMaxMs,
@@ -218,14 +237,40 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // ---- one-shot run ----
+    // ---- packages ----
+    if (req.method === 'GET' && url.pathname === '/api/packages') {
+      return json(res, 200, {
+        enabled: config.allowPackageInstall,
+        allowlist: allowlist(),
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/packages') {
+      if (isRateLimited(clientIp(req))) {
+        return json(res, 429, { ok: false, error: 'Too many requests, please slow down.' });
+      }
+      const payload = await parseJsonBody(req, res, 4096);
+      if (!payload) return undefined;
+      const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+      const result = await installPackage(name);
+      return json(res, result.ok ? 200 : 400, result);
+    }
+
+    // ---- one-shot run (script mode only) ----
     if (req.method === 'POST' && url.pathname === '/api/run') {
       if (isRateLimited(clientIp(req))) {
         return json(res, 429, { status: 'error', error: 'Too many requests, please slow down.' });
       }
-      const parsed = await parseRunBody(req, res);
-      if (!parsed) return undefined;
-
+      const payload = await parseJsonBody(req, res, config.maxCodeBytes + config.maxStdinBytes + 8192);
+      if (!payload) return undefined;
+      const code = typeof payload.code === 'string' ? payload.code : '';
+      const stdin = typeof payload.stdin === 'string' ? payload.stdin : '';
+      if (Buffer.byteLength(stdin, 'utf8') > config.maxStdinBytes) {
+        return json(res, 413, { status: 'error', error: 'stdin is too large.' });
+      }
+      const verdict = validate(code);
+      if (!verdict.ok) {
+        return json(res, 400, { status: 'rejected', error: `Error: ${verdict.reason}` });
+      }
       try {
         await acquireSlot();
       } catch {
@@ -235,20 +280,35 @@ const server = http.createServer(async (req, res) => {
         });
       }
       try {
-        const result = await execute(parsed);
-        return json(res, 200, result);
+        return json(res, 200, await execute({ code, stdin }));
       } finally {
         releaseSlot();
       }
     }
 
-    // ---- start an interactive run ----
+    // ---- start a run (script / repl / terminal) ----
     if (req.method === 'POST' && url.pathname === '/api/runs') {
       if (isRateLimited(clientIp(req))) {
         return json(res, 429, { status: 'error', error: 'Too many requests, please slow down.' });
       }
-      const parsed = await parseRunBody(req, res);
-      if (!parsed) return undefined;
+      const payload = await parseJsonBody(req, res, config.maxCodeBytes + config.maxStdinBytes + 8192);
+      if (!payload) return undefined;
+
+      const stdin = typeof payload.stdin === 'string' ? payload.stdin : '';
+      if (Buffer.byteLength(stdin, 'utf8') > config.maxStdinBytes) {
+        return json(res, 413, { status: 'error', error: 'stdin is too large.' });
+      }
+
+      const resolved = resolveMode(payload);
+      if (resolved.error) {
+        return json(res, 403, { status: 'error', error: resolved.error });
+      }
+      if (!resolved.skipValidation) {
+        const verdict = validate(resolved.code);
+        if (!verdict.ok) {
+          return json(res, 400, { status: 'rejected', error: `Error: ${verdict.reason}` });
+        }
+      }
 
       try {
         await acquireSlot();
@@ -261,15 +321,14 @@ const server = http.createServer(async (req, res) => {
 
       let run;
       try {
-        run = await createRun(parsed.code, { idleMs: config.runIdleMs, maxMs: config.runMaxMs });
+        run = await createRun(resolved.code, resolved.opts);
       } catch {
         releaseSlot();
         return json(res, 500, { status: 'error', error: 'Could not start the run.' });
       }
       run.done.then(() => releaseSlot());
-      // Pre-filled input (from the Input box) is delivered immediately.
-      if (parsed.stdin) run.write(parsed.stdin.endsWith('\n') ? parsed.stdin : `${parsed.stdin}\n`);
-      return json(res, 200, { runId: run.id });
+      if (stdin) run.write(stdin.endsWith('\n') ? stdin : `${stdin}\n`);
+      return json(res, 200, { runId: run.id, mode: resolved.mode });
     }
 
     // ---- stream a run's output ----
@@ -295,14 +354,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && inMatch) {
       const run = getRun(inMatch[1]);
       if (!run) return json(res, 404, { status: 'error', error: 'Unknown or finished run.' });
-      let body;
-      try {
-        body = await readBody(req, config.maxStdinBytes + 4096);
-      } catch {
-        return json(res, 413, { status: 'error', error: 'Input too large.' });
-      }
-      let payload;
-      try { payload = JSON.parse(body || '{}'); } catch { payload = {}; }
+      const payload = await parseJsonBody(req, res, config.maxStdinBytes + 4096);
+      if (!payload) return undefined;
       const data = typeof payload.data === 'string' ? payload.data : '';
       const ok = run.write(data.endsWith('\n') ? data : `${data}\n`);
       return json(res, 200, { ok });
@@ -331,7 +384,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(config.port, config.host, () => {
   // eslint-disable-next-line no-console
   console.log(`Mobile Py IDE running at http://${config.host}:${config.port}`);
-  console.log(`  interactive=on  idle=${config.runIdleMs}ms  max=${config.runMaxMs}ms  memory=${config.memoryLimitMb}MB  strict=${config.strictMode}`);
+  console.log(`  modes=script,repl${config.allowTerminal ? ',terminal' : ''}  packages=${config.allowPackageInstall}  memory=${config.memoryLimitMb}MB`);
 });
 
 export default server;

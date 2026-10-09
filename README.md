@@ -9,6 +9,10 @@ real terminal.
   input mid-run. No more `EOFError` because you forgot to fill a box first.
 - **Works on phone and desktop.** One page: tabs and a symbol bar on a phone,
   a two-pane editor/console layout on a wide screen.
+- **Three modes.** Script (run the editor), **REPL** (an interactive Python
+  prompt), and an optional **Terminal**.
+- **Install packages from the IDE.** Tap Packages, pick from a reviewed
+  allow-list of light libraries, watch pip run.
 - **Zero npm dependencies.** The backend uses only Node's built-in modules —
   nothing to `npm install`, fewer things to break.
 - **Sandboxed runner.** Every program runs in its own temp folder, as a
@@ -52,7 +56,9 @@ mobile-py-ide/
 │   ├── app.js         # zero-dep HTTP server, static files, API, SSE
 │   ├── config.js      # all tunables (env-driven)
 │   ├── validator.js   # blocked imports, blocked calls, allow-list mode
-│   ├── runs.js        # interactive streaming run engine
+│   ├── runs.js        # interactive streaming run engine (python + bash)
+│   ├── modes.js       # the REPL driver source
+│   ├── packages.js    # allow-listed pip installs
 │   └── executor.js    # one-shot wrapper around runs.js
 ├── public/
 │   ├── index.html     # responsive layout (mobile tabs + desktop split)
@@ -98,6 +104,17 @@ npm test           # 22 tests
 On a screen wider than 860px the tabs disappear and the editor and console sit
 side by side.
 
+## Modes
+
+The console has three modes:
+
+- **Script** — runs the code in the editor (the default).
+- **REPL** — an interactive Python prompt; press Run, then type one line at a
+  time and see each result immediately. Variables persist between lines.
+- **Terminal** — a shell on the server. **Off by default**: enable it with
+  `ALLOW_TERMINAL=true` in `.env`. Only do this while the IDE stays private
+  (behind Cloudflare Access) — it is remote shell access.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and edit. Highlights:
@@ -112,6 +129,10 @@ Copy `.env.example` to `.env` and edit. Highlights:
 | `MEMORY_LIMIT_MB` | `128` | Virtual-memory cap (`ulimit -v`) |
 | `MAX_CONCURRENT_RUNS` | `2` | Programs running at once (memory guard) |
 | `MAX_QUEUE` | `8` | Runs allowed to wait before a 429 |
+| `REPL_IDLE_MS` / `REPL_MAX_MS` | `300000` / `1800000` | REPL and terminal session limits |
+| `ALLOW_PACKAGE_INSTALL` | `true` | Allow allow-listed pip installs from the IDE |
+| `EXTRA_PACKAGES` | – | Extra package names to allow |
+| `ALLOW_TERMINAL` | `false` | Enable the shell (terminal) mode |
 | `STRICT_MODE` | `false` | `true` = only allow-listed modules may be imported |
 | `UNBLOCK_MODULES` | – | Remove names from the built-in blocked list |
 | `DISABLE_NETWORK` | `false` | Wrap the runner in `unshare -n` (needs root or userns) |
@@ -123,17 +144,27 @@ Copy `.env.example` to `.env` and edit. Highlights:
 
 ## Installing extra libraries
 
-The runner uses a virtual environment created by the bootstrap, so pip
-installs land somewhere isolated and safe:
+The runner uses a virtual environment created by the bootstrap, so pip installs
+land somewhere isolated and safe.
+
+**From the IDE:** tap **Packages** in the top bar, type a name (or tap one of
+the chips — those are exactly the allowed ones) and press Install. Only light,
+well-known packages are accepted; heavy libraries are refused on purpose.
+Extend the list with `EXTRA_PACKAGES` in `.env`.
+
+**From a shell on the server:**
 
 ```bash
 sudo bash deploy/add-packages.sh rich tabulate
 # then: import rich
 ```
 
-The IDE does not run `pip` from the browser on purpose — letting a web page
-install arbitrary code onto the server is a security hole, and a heavy package
-can exhaust a small box. Install deliberately, from a shell.
+The systemd unit grants the service write access to the venv (and `/tmp`) so
+pip can install; everything else on the system stays read-only.
+
+The IDE does not run arbitrary `pip` from the browser on purpose — letting a
+web page install any code onto the server is a security hole, and a heavy
+package can exhaust a small box.
 
 ## Server sizing
 
@@ -234,10 +265,12 @@ with `UNBLOCK_MODULES`.
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | – | status and limits |
 | `POST` | `/api/run` | `{ code, stdin }` | one-shot result (JSON) |
-| `POST` | `/api/runs` | `{ code, stdin? }` | `{ runId }` |
+| `POST` | `/api/runs` | `{ code, stdin?, mode }` | `{ runId }` — `mode`: script / repl / terminal |
 | `GET` | `/api/runs/:id/events` | – | Server-Sent Events stream |
 | `POST` | `/api/runs/:id/input` | `{ data }` | `{ ok }` |
 | `POST` | `/api/runs/:id/kill` | – | `{ ok }` |
+| `GET` | `/api/packages` | – | allowed package list |
+| `POST` | `/api/packages` | `{ name }` | install result |
 
 ```bash
 curl -s localhost:3000/api/run \
@@ -252,6 +285,9 @@ curl -s localhost:3000/api/run \
   run the runner as a dedicated low-privilege user and consider a container or
   VM per execution.
 - `os` and file access are blocked, so programs can't read or write files.
+- Terminal mode is remote shell access. It is off by default; enable it only
+  behind Cloudflare Access. It runs as the unprivileged service user inside the
+  systemd sandbox, so it cannot use `sudo` or write outside the venv and `/tmp`.
 - CodeMirror is pulled from `esm.sh`; if you want a fully offline IDE, vendor it
   locally, or let the plain-textarea fallback take over.
 

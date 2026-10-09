@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { validate } from '../server/validator.js';
 import { execute } from '../server/executor.js';
 import { createRun } from '../server/runs.js';
+import { REPL_SOURCE } from '../server/modes.js';
+import { isAllowed } from '../server/packages.js';
 
 let passed = 0;
 let failed = 0;
@@ -149,6 +151,45 @@ await checkAsync('reports exit status of a failing program', async () => {
   assert.equal(evt.status, 'error');
   assert.match(run.stderr, /boom/);
 });
+
+// Start a run and answer prompts; `kick` sends the first line without waiting
+// for output (a shell prints no prompt).
+function driveRun(code, opts, steps) {
+  return new Promise(async (resolve) => {
+    const run = await createRun(code, opts);
+    let out = '';
+    let i = 0;
+    run.subscribe((e) => {
+      if (e.type === 'output') {
+        out += e.text;
+        while (i < steps.length && out.includes(steps[i].when)) { run.write(steps[i].send); i++; }
+      } else if (e.type === 'exit') {
+        resolve({ out, exit: e });
+      }
+    });
+    if (opts.kick) {
+      setTimeout(() => { if (i < steps.length) { run.write(steps[i].send); i++; } }, opts.kick);
+    }
+  });
+}
+
+console.log('\nModes');
+await checkAsync('REPL prints a prompt and evaluates', async () => {
+  const { out } = await driveRun(REPL_SOURCE, { idleMs: 2500, maxMs: 8000 }, [{ when: '>>> ', send: '6*7\n' }]);
+  assert.match(out, />>> /);
+  assert.match(out, /42/);
+});
+await checkAsync('terminal runs a shell command', async () => {
+  const { out } = await driveRun('', { kind: 'bash', idleMs: 2500, maxMs: 8000, kick: 300 }, [{ when: '\u0000', send: 'echo from-the-shell\n' }]);
+  assert.match(out, /from-the-shell/);
+});
+
+console.log('\nPackages');
+check('allows a light package', () => assert.equal(isAllowed('rich'), true));
+check('accepts underscore spelling', () => assert.equal(isAllowed('python_dateutil'), true));
+check('refuses a heavy package', () => assert.equal(isAllowed('torch'), false));
+check('refuses shell metacharacters', () => assert.equal(isAllowed('rich; rm -rf /'), false));
+check('refuses an unknown name', () => assert.equal(isAllowed('definitely-not-a-real-pkg'), false));
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);

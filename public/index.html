@@ -18,6 +18,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo">🐍</span><span class="brand-text">Mobile Py IDE</span></div>
     <div class="actions">
+      <button id="pkgBtn" class="ghost-btn" type="button" title="Install a package" hidden>Packages</button>
       <button id="clearBtn" class="ghost-btn" type="button" title="Clear console">Clear</button>
       <button id="runBtn" class="run-btn" type="button">
         <span class="run-icon">▶</span><span id="runLabel">Run</span>
@@ -39,6 +40,11 @@
     </section>
 
     <section id="console" class="panel">
+      <div class="modebar" id="modebar" role="tablist" aria-label="Console mode">
+        <button type="button" class="mode active" data-mode="script">Script</button>
+        <button type="button" class="mode" data-mode="repl">REPL</button>
+        <button type="button" class="mode" data-mode="terminal" hidden>Terminal</button>
+      </div>
       <div id="output" class="console-output"><span class="muted">Press ▶ Run to execute your code.</span></div>
 
       <form id="inputForm" class="console-input" autocomplete="off">
@@ -94,6 +100,22 @@
     <button type="button" data-insert="def name():&#10;    " class="snip">def</button>
     <button type="button" data-insert="import " class="snip">import</button>
   </div>
+
+  <dialog id="pkgDialog" class="dialog">
+    <form method="dialog" class="dialog-head">
+      <h2>Install a package</h2>
+      <button class="mini-btn" type="submit">Close</button>
+    </form>
+    <p class="dialog-note">Only light, allow-listed packages can be installed from here. Heavy libraries (torch, tensorflow, pandas, …) are never allowed.</p>
+    <div class="pkg-row">
+      <input id="pkgInput" list="pkgList" placeholder="package name"
+        autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" />
+      <datalist id="pkgList"></datalist>
+      <button id="pkgInstall" type="button" class="run-btn small">Install</button>
+    </div>
+    <div class="pkg-allowed" id="pkgAllowed"></div>
+    <pre id="pkgOut" class="pkg-out" hidden></pre>
+  </dialog>
 
   <script type="module" src="main.js"></script>
 </body>
