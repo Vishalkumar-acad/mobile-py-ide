@@ -1,0 +1,46 @@
+name: Run server setup
+
+# Runs deploy/bootstrap.sh on the server — installs Node, the Python
+# environment for packages, the workspace folder and the systemd service.
+# Use this from the GitHub UI instead of typing commands in a terminal.
+#
+# Requires the same SSH secrets as the deploy workflow:
+#   SSH_HOST, SSH_USER, SSH_PRIVATE_KEY  (optional: SSH_PORT)
+#
+# Safe to run any time; the bootstrap is idempotent and never overwrites your
+# existing .env settings.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: server-setup
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+
+    steps:
+      - name: Skip — SSH secrets not configured
+        if: env.SSH_HOST == ''
+        run: echo "SSH_HOST is not set. Add the SSH_* repository secrets first."
+
+      - name: Bootstrap the server
+        if: env.SSH_HOST != ''
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              "$SSH_USER@$SSH_HOST" \
+              'curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o /tmp/bootstrap.sh && sudo bash /tmp/bootstrap.sh'

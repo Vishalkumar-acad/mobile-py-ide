@@ -22,6 +22,9 @@
 #
 set -euo pipefail
 
+# Say clearly what happened if any step fails (it is always safe to re-run).
+trap 'echo >&2; echo "[x] Bootstrap stopped at line $LINENO — the error is just above." >&2; echo "    Fix it and run again; this script is safe to re-run." >&2' ERR
+
 REPO_URL="${REPO_URL:-https://github.com/Vishalkumar-acad/mobile-py-ide.git}"
 APP_DIR="${APP_DIR:-/opt/mobile-py-ide}"
 APP_USER="${APP_USER:-mobilepy}"
@@ -66,6 +69,9 @@ if ! id -u "$APP_USER" >/dev/null 2>&1; then
 fi
 
 # --- 4. code ------------------------------------------------------------
+# git refuses to touch a repo owned by another user unless we tell it the
+# directory is safe. Without this the whole script stops here.
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 if [ -d "$APP_DIR/.git" ]; then
   log "Updating existing checkout in $APP_DIR"
   git -C "$APP_DIR" fetch --depth 1 origin main
