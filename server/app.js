@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { validate } from './validator.js';
 import { execute } from './executor.js';
-import { createRun, getRun } from './runs.js';
+import { createRun, getRun, killRunsForSpace } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
 import { allowlist, installPackage } from './packages.js';
 import { listFiles, readFile, writeFile, deleteFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
@@ -328,6 +328,10 @@ const server = http.createServer(async (req, res) => {
       const space = await identify(req, res);
       if (!space) return json(res, 400, { status: 'error', error: 'No space for this visitor.' });
 
+      // Starting a new session replaces your previous one, so a session left
+      // behind by a page reload cannot block you with "server is busy".
+      await killRunsForSpace(space.id);
+
       try {
         await acquireSlot();
       } catch {
@@ -339,7 +343,7 @@ const server = http.createServer(async (req, res) => {
 
       let run;
       try {
-        run = await createRun(resolved.code, { ...resolved.opts, cwd: space.dir });
+        run = await createRun(resolved.code, { ...resolved.opts, cwd: space.dir, spaceId: space.id });
       } catch {
         releaseSlot();
         return json(res, 500, { status: 'error', error: 'Could not start the run.' });

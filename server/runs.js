@@ -26,6 +26,26 @@ export function activeRunCount() {
   return runs.size;
 }
 
+// Stop every live run that belongs to one visitor, and wait (briefly) for them
+// to actually go, so the slot is free before the next run asks for it.
+export async function killRunsForSpace(spaceId) {
+  if (!spaceId) return 0;
+  const victims = [];
+  for (const run of runs.values()) {
+    if (run.spaceId === spaceId && !run.finished) {
+      run.kill();
+      victims.push(run.done);
+    }
+  }
+  if (victims.length) {
+    await Promise.race([
+      Promise.all(victims),
+      new Promise((resolve) => { setTimeout(resolve, 2000).unref(); }),
+    ]);
+  }
+  return victims.length;
+}
+
 // kind: 'python' runs the given code file; 'bash' starts a shell reading
 // commands from stdin (the terminal mode).
 function buildCommand({ filePath, kind, memoryMb, maxMs }) {
@@ -54,6 +74,7 @@ export async function createRun(code, opts = {}) {
   const kind = opts.kind === 'bash' ? 'bash' : 'python';
   const memoryMb = opts.memoryMb ?? config.memoryLimitMb;
   const workDir = opts.cwd || config.workspaceDir;
+  const spaceId = opts.spaceId || null;
 
   const id = crypto.randomBytes(9).toString('hex');
   // The caller's space is the working directory, so files written with a
@@ -74,6 +95,7 @@ export async function createRun(code, opts = {}) {
     id,
     dir,
     kind,
+    spaceId,
     startedAt: Date.now(),
     finished: false,
     truncated: false,

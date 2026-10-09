@@ -1,17 +1,27 @@
 name: Run server setup
 
-# Runs deploy/bootstrap.sh on the server — installs Node, the Python
-# environment for packages, the workspace folder and the systemd service.
-# Use this from the GitHub UI instead of typing commands in a terminal.
+# Runs deploy/bootstrap.sh on the server and applies two switches:
+#   allow_terminal  -> the shell (Terminal mode) in the IDE
+#   allow_packages  -> installing packages from the IDE
+#
+# Use this from the GitHub UI (Actions -> Run server setup -> Run workflow)
+# instead of typing commands in a terminal. Safe to run any time; the
+# bootstrap is idempotent and never overwrites unrelated .env settings.
 #
 # Requires the same SSH secrets as the deploy workflow:
 #   SSH_HOST, SSH_USER, SSH_PRIVATE_KEY  (optional: SSH_PORT)
-#
-# Safe to run any time; the bootstrap is idempotent and never overwrites your
-# existing .env settings.
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_terminal:
+        description: 'Enable the shell (Terminal mode)? true or false'
+        required: false
+        default: 'false'
+      allow_packages:
+        description: 'Allow installing packages from the IDE? true or false'
+        required: false
+        default: 'true'
 
 concurrency:
   group: server-setup
@@ -25,6 +35,8 @@ jobs:
       SSH_USER: ${{ secrets.SSH_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      ALLOW_TERMINAL: ${{ github.event.inputs.allow_terminal || 'false' }}
+      ALLOW_PACKAGES: ${{ github.event.inputs.allow_packages || 'true' }}
 
     steps:
       - name: Skip — SSH secrets not configured
@@ -43,4 +55,30 @@ jobs:
               -o StrictHostKeyChecking=accept-new \
               -o ConnectTimeout=15 \
               "$SSH_USER@$SSH_HOST" \
-              'set -e; sudo git config --global --add safe.directory /opt/mobile-py-ide; sudo git -C /opt/mobile-py-ide fetch --depth 1 origin main; sudo git -C /opt/mobile-py-ide reset --hard origin/main; sudo bash /opt/mobile-py-ide/deploy/bootstrap.sh'
+              "ALLOW_TERMINAL='$ALLOW_TERMINAL' ALLOW_PACKAGES='$ALLOW_PACKAGES' bash -s" <<'REMOTE'
+          set -e
+
+          sudo git config --global --add safe.directory /opt/mobile-py-ide
+          sudo git -C /opt/mobile-py-ide fetch --depth 1 origin main
+          sudo git -C /opt/mobile-py-ide reset --hard origin/main
+          sudo bash /opt/mobile-py-ide/deploy/bootstrap.sh
+
+          echo "==> Applying settings"
+          set_env() {
+            if grep -q "^$1=" /opt/mobile-py-ide/.env; then
+              sudo sed -i "s|^$1=.*|$1=$2|" /opt/mobile-py-ide/.env
+            else
+              echo "$1=$2" | sudo tee -a /opt/mobile-py-ide/.env >/dev/null
+            fi
+            echo "    $1=$2"
+          }
+          set_env ALLOW_TERMINAL "$ALLOW_TERMINAL"
+          set_env ALLOW_PACKAGE_INSTALL "$ALLOW_PACKAGES"
+
+          sudo systemctl restart mobile-py-ide
+          sleep 1
+
+          echo "==> Health"
+          curl -fsS http://127.0.0.1:3000/api/health
+          echo
+          REMOTE
