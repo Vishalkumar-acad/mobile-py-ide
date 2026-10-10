@@ -59,6 +59,7 @@
   <h1>How to use PyPad</h1>
   <p class="sub">A small, safe place to write and run Python from a phone or a desktop browser.</p>
   <nav class="toc">
+    <a href="#new">What's new</a>
     <a href="#start">Getting started</a>
     <a href="#screen">The screen</a>
     <a href="#modes">Modes</a>
@@ -74,9 +75,15 @@
   </nav>
 </header>
 
-<div class="card ok">
-  <strong>New — the desktop terminal.</strong> On a laptop or desktop, REPL and Terminal now open as a <em>real</em> terminal: type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt, arrow-key history, <kbd>Tab</kbd> completion and working paste. There is no Send button. Phones keep the lighter line-by-line console. Details in <a href="#terminal">The desktop terminal</a>.
-</div>
+<h2 id="new">What's new</h2>
+<ul>
+  <li><strong>The desktop terminal.</strong> On a laptop or desktop, REPL and Terminal open as a <em>real</em> terminal — a genuine <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt, arrow-key history, <kbd>Tab</kbd> completion, and paste that works. No Send button. <a href="#terminal">Details</a></li>
+  <li><strong>Save your code as a <code>.py</code> file.</strong> A name box and a <strong>⤓ Save .py</strong> button sit above the editor, with <strong>⋯</strong> beside them for three more ways out — for devices that refuse a download. <a href="#screen">Details</a></li>
+  <li><strong>Packages can be removed, not only installed.</strong> Everything in the venv is listed with an <strong>✕</strong> beside it. <a href="#packages">Details</a></li>
+  <li><strong>Three more packages are available:</strong> <code>python-slugify</code>, <code>pylightxl</code> and <code>humanfriendly</code>. <a href="#packages">Details</a></li>
+  <li><strong>Switching mode ends the old session</strong>, so a shell can never quietly receive the lines you meant for Python. <a href="#terminal">Details</a></li>
+  <li><strong>Updates arrive on their own.</strong> Every file is stamped with the build it came from, so a new version can no longer hide behind a cache. <a href="#host">Details</a></li>
+</ul>
 
 <h2 id="start">Getting started</h2>
 <p>Open the IDE in your browser — on a phone it looks like this:</p>
@@ -175,6 +182,7 @@ print("Hello,", name, "!")</code></pre>
   <li>Press <strong>Install</strong>. When it finishes, <code>import</code> that package in your code.</li>
 </ol>
 <p><strong>Removing one.</strong> Open <strong>Packages</strong> again — everything currently installed is listed at the bottom, each with an <strong>✕</strong>. Tap it to take that package back out. Nothing here is permanent.</p>
+<p><strong>Recently added to the list:</strong> <code>python-slugify</code> (turns text into URL-friendly slugs — use it as <code>import slugify</code>), <code>pylightxl</code> (read and write <code>.xlsx</code> files, with no dependencies at all) and <code>humanfriendly</code> (format sizes, times and numbers the way a person would say them). Typing <code>slugify</code> is accepted as well: the bare <code>slugify</code> package on PyPI is a Python-2 leftover that raises <code>NameError</code> on Python 3, so that name installs <code>python-slugify</code> instead.</p>
 <p>Only light, well-known packages can be installed. Heavy libraries — <code>torch</code>, <code>tensorflow</code>, <code>pandas</code>, <code>scipy</code> and friends — are refused, because they do not fit a small server and the whole point is to keep it quick.</p>
 <p>Want one that is not on the list? Add it to <code>EXTRA_PACKAGES</code> in <code>.env</code> on the server, or install from a shell:</p>
 <pre><code>sudo bash deploy/add-packages.sh rich tabulate</code></pre>
@@ -190,6 +198,7 @@ print("Hello,", name, "!")</code></pre>
 # next run:
 print(open("notes.txt").read())</code></pre>
 <p>Tap <strong>Files</strong> in the top bar to see everything in the workspace, download a file, upload one, or delete one. The line at the bottom shows how much space is used out of the limit.</p>
+<p>A file you save from the editor with <strong>⋯ → Download via server</strong> lands here too, so it is easy to find again.</p>
 <div class="card ok">
   <strong>Your own space — no account needed.</strong> The first time you open PyPad, the server gives this browser a random anonymous id, and everything you save lives in a folder that only that id can reach. You cannot see anyone else's files and they cannot see yours. There is no password to remember — but that also means: if you clear the browser's cookies you lose the space, and a different browser or device gets a different one.
 </div>
@@ -255,6 +264,7 @@ print(open("notes.txt").read())</code></pre>
 <pre><code>curl -fsSL https://raw.githubusercontent.com/Vishalkumar-acad/mobile-py-ide/main/deploy/bootstrap.sh -o bootstrap.sh
 sudo bash bootstrap.sh</code></pre>
 <p>Put it behind a Cloudflare Tunnel with a Cloudflare Access policy and only you can reach it. Pushes to <code>main</code> deploy themselves through GitHub Actions.</p>
+<p><strong>Updates reach the browser by themselves.</strong> Every front-end file is served stamped with the build it came from, and the modules carry that stamp on to what they import. A cache — the browser's, or a CDN's — therefore cannot serve yesterday's JavaScript after a deploy, which is otherwise a very convincing way for a fixed bug to look unfixed. Cloudflare in particular caches <code>.js</code> and <code>.css</code> by extension and can override an origin's <code>Cache-Control</code>, so the stamp is what makes a deploy actually arrive.</p>
 
 <footer>
   <p>PyPad — MIT licensed. Source: <a href="https://github.com/Vishalkumar-acad/mobile-py-ide">github.com/Vishalkumar-acad/mobile-py-ide</a></p>
