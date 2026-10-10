@@ -511,7 +511,7 @@ function reportNewFiles() {
   if (!before) return;
   snapshotFiles().then((now) => {
     if (!now) return;
-    const added = [...now].filter((n) => !before.has(n));
+    const added = [...now].filter((n) => !before.has(n) && !n.split('/').pop().startsWith('.'));
     if (added.length) {
       appendOutput(`\n📄 saved in your space: ${added.join(', ')} — tap Files to open\n`, 'muted');
     }
