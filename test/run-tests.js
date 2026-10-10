@@ -11,6 +11,7 @@ import { isAllowed, uninstallPackage, listInstalled } from '../server/packages.j
 import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
 import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
 import config from '../server/config.js';
+import { pythonFilename, PYTHON_MIME } from '../public/download.js';
 
 const BASE = spaceDir('f'.repeat(32));
 
@@ -235,6 +236,32 @@ await checkAsync('listInstalled reports the venv without pip scaffolding', async
   const list = await listInstalled();
   assert.ok(Array.isArray(list));
   assert.ok(!list.some((p) => /^(pip|setuptools|wheel)$/i.test(p.name)), 'pip itself should be hidden');
+});
+
+console.log('\nSaving code as a file');
+check('a blank or unusable name falls back to script.py', () => {
+  assert.equal(pythonFilename(''), 'script.py');
+  assert.equal(pythonFilename('   '), 'script.py');
+  assert.equal(pythonFilename('....'), 'script.py');
+  assert.equal(pythonFilename(undefined), 'script.py');
+});
+check('spaces become dashes and .py is added once', () => {
+  assert.equal(pythonFilename('my script'), 'my-script.py');
+  assert.equal(pythonFilename('hello.py'), 'hello.py');
+  assert.equal(pythonFilename('report.final.py'), 'report.final.py');
+});
+check('a name cannot escape into a path', () => {
+  assert.equal(pythonFilename('../../etc/passwd'), 'etc-passwd.py');
+  assert.equal(pythonFilename(String.raw`a/b\c`), 'a-b-c.py');
+  assert.equal(pythonFilename('/etc/shadow'), 'etc-shadow.py');
+});
+check('a very long name is trimmed', () => {
+  const n = pythonFilename('x'.repeat(500));
+  assert.ok(n.length <= 67, `got ${n.length}`);
+  assert.ok(n.endsWith('.py'));
+});
+check('the Python MIME type is the one asked for', () => {
+  assert.equal(PYTHON_MIME, 'text/x-python;charset=utf-8');
 });
 
 console.log('\nWorkspace files');

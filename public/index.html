@@ -35,6 +35,12 @@
 
   <main>
     <section id="editor" class="panel active">
+      <div class="editor-bar">
+        <input id="fileName" class="file-name" type="text" value="script.py" spellcheck="false"
+          autocapitalize="off" autocomplete="off" autocorrect="off"
+          aria-label="Name to save this code as" />
+        <button id="downloadBtn" class="mini-btn" type="button" title="Save this code to your device as a .py file">⤓ Save .py</button>
+      </div>
       <div id="editorMount" class="editor-mount"></div>
       <textarea id="editorFallback" class="editor-fallback" spellcheck="false"
         autocapitalize="off" autocomplete="off" autocorrect="off"

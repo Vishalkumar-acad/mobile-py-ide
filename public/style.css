@@ -119,6 +119,28 @@ main {
 .panel.active { display: flex; flex-direction: column; }
 
 /* editor */
+.editor-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+  color: var(--text);
+}
+.file-name:focus { outline: none; border-color: var(--accent); }
+.editor-bar .mini-btn { flex: 0 0 auto; }
 .editor-mount { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .editor-mount .cm-editor { height: 100%; }
 .editor-mount .cm-scroller { overflow: auto; -webkit-overflow-scrolling: touch; }

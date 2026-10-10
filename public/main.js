@@ -5,6 +5,8 @@
 // input() works live: the program prints a prompt, you type a line and press
 // Enter, and it continues — just like a terminal.
 
+import { downloadPython, pythonFilename } from './download.js';
+
 const DEFAULT_CODE = `# Mobile Py IDE — a live console
 name = input("What is your name? ")
 print("Hello,", name, "!")
@@ -26,6 +28,8 @@ const runBtn = $('#runBtn');
 const runLabel = $('#runLabel');
 const runIcon = document.querySelector('.run-icon');
 const clearBtn = $('#clearBtn');
+const fileNameInput = $('#fileName');
+const downloadBtn = $('#downloadBtn');
 const inputForm = $('#inputForm');
 const inputLine = $('#inputLine');
 const sendBtn = $('#sendBtn');
@@ -435,6 +439,47 @@ inputForm.addEventListener('submit', async (e) => {
 });
 
 runBtn.addEventListener('click', onRunClick);
+
+/* --------------------------- save as .py ----------------------------- */
+// Entirely client side: the code is wrapped in a Blob and handed straight to
+// the browser, so nothing is uploaded anywhere. The click handler stays
+// synchronous on purpose — iOS Safari only allows a download that starts inside
+// the same user gesture, so there is no await before downloadPython().
+const STORAGE_FILENAME = 'pypad-file-name';
+
+try {
+  const remembered = localStorage.getItem(STORAGE_FILENAME);
+  if (remembered) fileNameInput.value = remembered;
+} catch { /* private mode, ignore */ }
+
+function rememberName(name) {
+  fileNameInput.value = name;
+  try { localStorage.setItem(STORAGE_FILENAME, name); } catch { /* ignore */ }
+}
+
+// Tidy the name up as soon as the field loses focus, so what you see is what
+// gets saved.
+fileNameInput.addEventListener('change', () => rememberName(pythonFilename(fileNameInput.value)));
+fileNameInput.addEventListener('blur', () => rememberName(pythonFilename(fileNameInput.value)));
+
+function saveCodeAsPy() {
+  const name = pythonFilename(fileNameInput.value);
+  rememberName(name);
+  const code = getCode();
+  const { bytes } = downloadPython(code, name);
+  setStatus('success', `✓ Saved ${name} · ${bytes} bytes`);
+}
+
+downloadBtn.addEventListener('click', saveCodeAsPy);
+
+// Ctrl/Cmd+S in the editor saves instead of opening the browser's own dialog.
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    saveCodeAsPy();
+  }
+});
+
 clearBtn.addEventListener('click', () => {
   clearOutput();
   const s = document.createElement('span');
