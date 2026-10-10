@@ -47,6 +47,9 @@
                border-radius: 8px; padding: 5px 12px; min-height: 32px; }
   .theme-btn:hover { color: var(--accent); border-color: var(--accent); }
   .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
+  /* The top bar is sticky, so without this a contents link would scroll its
+     heading to the very top — and hide it behind the bar. */
+  [id] { scroll-margin-top: 72px; }
   /* ---------- top bar ---------- */
   .topbar { position: sticky; top: 0; z-index: 30; background: var(--bg);
             border-bottom: 1px solid var(--border); }
@@ -118,6 +121,9 @@
   .bad  { border-left: 3px solid var(--danger); }
   .ok   { border-left: 3px solid var(--accent-2); }
   img.shot { width:100%; border:1px solid var(--border); border-radius:12px; margin: 12px 0 4px; }
+  /* A phone screenshot blown up to the full column would be a billboard, so
+     this one is kept at roughly the size of the phone it came from. */
+  img.shot.phone { max-width: 360px; display: block; margin-left: auto; margin-right: auto; }
   figure { margin: 18px 0; }
   figcaption { color: var(--muted); font-size: 13px; text-align:center; }
   kbd { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev-2);
@@ -252,7 +258,7 @@
 <h2 id="start">Getting started</h2>
 <p>Open the IDE in your browser — on a phone it looks like this:</p>
 <figure>
-  <img class="shot" src="screenshot-mobile.png" alt="The IDE on a phone, running a program that asked for a name" />
+  <img class="shot phone" src="screenshot-mobile.png" alt="The IDE on a phone, running a program that asked for a name" />
   <figcaption>A program that asked for input, answered live in the console.</figcaption>
 </figure>
 <p>Type some Python in the <strong>Code</strong> area, press <strong>▶ Run</strong>, and the output appears in the <strong>Console</strong>. That is the whole loop.</p>
