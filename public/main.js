@@ -326,8 +326,7 @@ function openStream(id) {
     try { e = JSON.parse(ev.data); } catch { return; }
     receivedEvents = true;
     if (e.type === 'output') {
-      if (e.raw) appendOutput(terminalText(e.b64), null);
-      else appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
+      appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
     } else if (e.type === 'exit') {
       finishRun(e);
     }
@@ -464,45 +463,6 @@ inputForm.addEventListener('submit', async (e) => {
 });
 
 runBtn.addEventListener('click', onRunClick);
-
-/* -------------------- terminal bytes, for the text console ------------ */
-// The terminal runs under a real pseudoterminal, so its output arrives as
-// bytes carrying the escape sequences a terminal would use. This turns them
-// back into something the line-based console can show.
-const termBytesDecoder = new TextDecoder();
-let termBytesPending = '';
-
-// Is this a complete escape sequence, or has one been split across two chunks?
-function escapeIsComplete(seq) {
-  return /^\x1b\[[0-9;?]*[ -/]*[@-~]/.test(seq)          // CSI
-    || /^\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/.test(seq)     // OSC
-    || /^\x1b[()][A-Za-z0-9]/.test(seq)                   // charset
-    || /^\x1b[@-Z\\-_]/.test(seq);                        // two-byte escape
-}
-
-function terminalText(b64) {
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  let s = termBytesPending + termBytesDecoder.decode(bytes, { stream: true });
-  termBytesPending = '';
-
-  // Hold back an escape sequence that is still arriving.
-  const cut = s.lastIndexOf('\x1b');
-  if (cut !== -1 && !escapeIsComplete(s.slice(cut))) {
-    termBytesPending = s.slice(cut);
-    s = s.slice(0, cut);
-  }
-
-  s = s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, ''); // OSC … BEL/ST
-  s = s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '');           // CSI
-  s = s.replace(/\x1b[()][A-Za-z0-9]/g, '');                 // charset
-  s = s.replace(/\x1b[@-Z\\-_]/g, '');                       // the rest
-  s = s.replace(/\r\n\r/g, '\r\n');                          // the pty's stray CR
-  s = s.replace(/\r(?!\n)/g, '\n');                          // a lone CR is a redraw
-  s = s.replace(/\r\n/g, '\n');
-  s = s.replace(/[^\n]\x08/g, '');                           // backspace erases
-  s = s.replace(/\x08/g, '');
-  return s;
-}
 
 /* --------------------------- save as .py ----------------------------- */
 // Entirely client side: the code is wrapped in a Blob and handed straight to

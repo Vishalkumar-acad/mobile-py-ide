@@ -458,7 +458,14 @@ const server = http.createServer(async (req, res) => {
       const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch { /* gone */ } }, 15000);
       const unsub = run.subscribe((evt) => {
         try {
-          res.write(`data: ${JSON.stringify(evt)}\n\n`);
+          // The console is plain text, so the base64 copy of a terminal chunk is
+          // dropped here — it is only needed on the WebSocket, which sends the
+          // bytes themselves. That also keeps this stream readable to a browser
+          // running an older copy of the page.
+          const out = evt.type === 'output' && evt.b64
+            ? { type: 'output', stream: evt.stream || 'stdout', text: evt.text ?? '' }
+            : evt;
+          res.write(`data: ${JSON.stringify(out)}\n\n`);
           if (evt.type === 'exit') { clearInterval(hb); res.end(); }
         } catch { /* client gone */ }
       });

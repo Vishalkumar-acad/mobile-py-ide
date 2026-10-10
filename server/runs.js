@@ -11,6 +11,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import config from './config.js';
 import { PTY_DRIVER } from './pty.js';
+import { createTerminalText } from './terminal-text.js';
 
 const runs = new Map();
 const LOG_CAP = 800;
@@ -83,6 +84,7 @@ export async function createRun(code, opts = {}) {
   const spaceId = opts.spaceId || null;
   const ptyCmd = opts.ptyCmd || 'bash -i';
   const raw = kind === 'pty';
+  const termText = raw ? createTerminalText() : null;
 
   const id = crypto.randomBytes(9).toString('hex');
   // The caller's space is the working directory, so files written with a
@@ -214,8 +216,17 @@ export async function createRun(code, opts = {}) {
     }
 
     if (raw) {
-      // A terminal stream is bytes, not text — send it base64 so nothing is lost.
-      emit({ type: 'output', raw: true, b64: piece.toString('base64') });
+      // A terminal stream is bytes, not text — the WebSocket sends them as they
+      // are. The same chunk also goes out as cleaned-up text, so the line-based
+      // console (and a browser running an older copy of the page) still gets
+      // something readable instead of nothing at all.
+      emit({
+        type: 'output',
+        raw: true,
+        stream: 'stdout',
+        b64: piece.toString('base64'),
+        text: termText.push(piece),
+      });
     } else {
       const text = piece.toString('utf8');
       if (stream === 'stdout') run.stdout += text; else run.stderr += text;

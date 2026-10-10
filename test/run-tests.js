@@ -12,6 +12,7 @@ import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
 import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
 import config from '../server/config.js';
 import { pythonFilename, PYTHON_MIME } from '../public/download.js';
+import { createTerminalText } from '../server/terminal-text.js';
 
 const BASE = spaceDir('f'.repeat(32));
 
@@ -236,6 +237,25 @@ await checkAsync('listInstalled reports the venv without pip scaffolding', async
   const list = await listInstalled();
   assert.ok(Array.isArray(list));
   assert.ok(!list.some((p) => /^(pip|setuptools|wheel)$/i.test(p.name)), 'pip itself should be hidden');
+});
+
+console.log('\nTerminal output as text');
+check('escape codes are cleaned out of a terminal stream', () => {
+  const t = createTerminalText();
+  const out = t.push(Buffer.from('\x1b[?2004h$ ls\r\n\x1b[?2004l\rnotes.txt\r\n$ ', 'utf8'));
+  assert.equal(out.includes('\x1b'), false, 'no escape bytes should be left');
+  assert.match(out, /\$ ls/);
+  assert.match(out, /notes\.txt/);
+});
+check('an escape sequence split across chunks is held back', () => {
+  const t = createTerminalText();
+  assert.equal(t.push(Buffer.from('\x1b[?20', 'utf8')), '', 'nothing should come out yet');
+  assert.equal(t.push(Buffer.from('04hhello', 'utf8')), 'hello');
+});
+check('a carriage-return redraw does not duplicate the line', () => {
+  const t = createTerminalText();
+  const out = t.push(Buffer.from('$ echo hi\r\n\rhi\r\n$ ', 'utf8'));
+  assert.equal(out, '$ echo hi\nhi\n$ ');
 });
 
 console.log('\nSaving code as a file');
