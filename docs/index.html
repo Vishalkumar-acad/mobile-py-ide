@@ -85,7 +85,8 @@
   <figcaption>A program that asked for input, answered live in the console.</figcaption>
 </figure>
 <p>Type some Python in the <strong>Code</strong> area, press <strong>▶ Run</strong>, and the output appears in the <strong>Console</strong>. That is the whole loop.</p>
-<p>Your code is kept in the browser as you type, so it is still there next time. When you want a real file on your device, the bar above the editor has a name box and a <strong>⤓ Save .py</strong> button — or press <kbd>Ctrl</kbd>+<kbd>S</kbd>. Nothing is uploaded: the file is built in your browser and handed straight to it, which is why it works on a phone just as well.</p>
+<p>Your code is kept in the browser as you type, so it is still there next time. When you want a real file on your device, the bar above the editor has a name box and a <strong>⤓ Save .py</strong> button — or press <kbd>Ctrl</kbd>+<kbd>S</kbd>. Nothing is uploaded: the file is built in your browser and handed straight to it.</p>
+<p>Not every browser allows that — in-app webviews and some Android browsers refuse downloads from a page. So the <strong>⋯</strong> button next to it offers three more ways out: <strong>Download via server</strong>, <strong>Share</strong> (your phone's own save menu) and <strong>Copy code</strong>. One of them will work; <strong>Copy</strong> works everywhere.</p>
 
 <h2 id="screen">The screen</h2>
 <table>
@@ -96,7 +97,7 @@
   <tr><td><strong>Symbol bar</strong></td><td>The scrollable row at the bottom with <code>:</code> <code>(</code> <code>"</code> <code>_</code> and shortcuts like <code>print()</code>, <code>input()</code>, <code>for</code>, <code>if</code>. Tap to insert at the cursor — no keyboard switching needed.</td></tr>
   <tr><td><strong>› input line</strong></td><td>Where you type answers to a running program (see below). On a desktop in REPL or Terminal mode this is replaced by the real terminal.</td></tr>
   <tr><td><strong>Pre-fill input</strong></td><td>Optional: lines sent to the program the moment it starts.</td></tr>
-  <tr><td><strong>⤓ Save .py</strong></td><td>The bar above the editor. Type a name, press it, and your code is saved to your device as a <code>.py</code> file. <kbd>Ctrl</kbd>+<kbd>S</kbd> does the same.</td></tr>
+  <tr><td><strong>⤓ Save .py</strong></td><td>The bar above the editor. Type a name, press it, and your code is saved to your device as a <code>.py</code> file. <kbd>Ctrl</kbd>+<kbd>S</kbd> does the same. The <strong>⋯</strong> beside it offers other ways out, for devices that refuse a download.</td></tr>
 </table>
 <p>On a desktop the <strong>Send</strong> button and the <strong>⇅</strong> move button are hidden — <kbd>Enter</kbd> sends the line, so there is nothing to reach for.</p>
 <p>On a desktop it becomes a two-pane layout — editor on the left, console on the right:</p>
@@ -222,6 +223,7 @@ print(open("notes.txt").read())</code></pre>
   <tr><td>Paste does nothing in the terminal</td><td>Click once inside the terminal, then paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. The terminal now takes focus by itself, so this should not happen — but a click always fixes it.</td></tr>
   <tr><td>A <code>$</code> prompt appears in REPL mode</td><td>That is the shell, so check which mode button is highlighted. Changing mode also ends the old session, so press <strong>▶ Run</strong> again to get a fresh <code>&gt;&gt;&gt;</code>.</td></tr>
   <tr><td>The old session keeps answering after you switch mode</td><td>Changing mode ends the previous session. Press <strong>▶ Run</strong> to start the new one.</td></tr>
+  <tr><td>Save .py does nothing</td><td>Some browsers — and most in-app webviews — refuse a download started by a page. Tap <strong>⋯</strong> beside the button and use <strong>Download via server</strong>, <strong>Share</strong>, or <strong>Copy code</strong>. Copy works everywhere; Share opens your phone's own save menu.</td></tr>
 </table>
 
 <h2 id="api">API</h2>

@@ -40,6 +40,7 @@
           autocapitalize="off" autocomplete="off" autocorrect="off"
           aria-label="Name to save this code as" />
         <button id="downloadBtn" class="mini-btn" type="button" title="Save this code to your device as a .py file">⤓ Save .py</button>
+        <button id="saveMoreBtn" class="mini-btn" type="button" title="Other ways to get your code out">⋯</button>
       </div>
       <div id="editorMount" class="editor-mount"></div>
       <textarea id="editorFallback" class="editor-fallback" spellcheck="false"
@@ -128,6 +129,21 @@
     <div class="pkg-installed-head">Installed — tap ✕ to remove</div>
     <div class="pkg-installed" id="pkgInstalled"></div>
     <pre id="pkgOut" class="pkg-out" hidden></pre>
+  </dialog>
+
+  <dialog id="saveDialog" class="dialog">
+    <form method="dialog" class="dialog-head">
+      <h2>Get your code out</h2>
+      <button class="mini-btn" type="submit">Close</button>
+    </form>
+    <p class="dialog-note">Devices allow different things. If one of these does nothing, try the next — <strong>Copy</strong> works everywhere, and <strong>Share</strong> opens your phone's own save menu.</p>
+    <div class="save-actions">
+      <button id="saveDownload" class="run-btn small" type="button">⤓ Download .py</button>
+      <button id="saveServer" class="ghost-btn" type="button">⤓ Download via server</button>
+      <button id="saveShare" class="ghost-btn" type="button">↗ Share</button>
+      <button id="saveCopy" class="ghost-btn" type="button">⧉ Copy code</button>
+    </div>
+    <pre id="saveOut" class="pkg-out" hidden></pre>
   </dialog>
 
   <dialog id="filesDialog" class="dialog">

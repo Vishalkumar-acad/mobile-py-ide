@@ -141,6 +141,9 @@ main {
 }
 .file-name:focus { outline: none; border-color: var(--accent); }
 .editor-bar .mini-btn { flex: 0 0 auto; }
+
+.save-actions { display: flex; flex-direction: column; gap: 8px; padding: 4px 16px 0; }
+.save-actions button { width: 100%; height: 40px; font-size: 13.5px; justify-content: center; }
 .editor-mount { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .editor-mount .cm-editor { height: 100%; }
 .editor-mount .cm-scroller { overflow: auto; -webkit-overflow-scrolling: touch; }

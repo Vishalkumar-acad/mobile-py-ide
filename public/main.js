@@ -5,7 +5,7 @@
 // input() works live: the program prints a prompt, you type a line and press
 // Enter, and it continues — just like a terminal.
 
-import { downloadPython, pythonFilename } from './download.js';
+import { downloadPython, pythonFilename, canShareFiles, sharePython, copyText } from './download.js';
 
 const DEFAULT_CODE = `# Mobile Py IDE — a live console
 name = input("What is your name? ")
@@ -30,6 +30,13 @@ const runIcon = document.querySelector('.run-icon');
 const clearBtn = $('#clearBtn');
 const fileNameInput = $('#fileName');
 const downloadBtn = $('#downloadBtn');
+const saveMoreBtn = $('#saveMoreBtn');
+const saveDialog = $('#saveDialog');
+const saveDownload = $('#saveDownload');
+const saveServer = $('#saveServer');
+const saveShare = $('#saveShare');
+const saveCopy = $('#saveCopy');
+const saveOut = $('#saveOut');
 const inputForm = $('#inputForm');
 const inputLine = $('#inputLine');
 const sendBtn = $('#sendBtn');
@@ -471,6 +478,79 @@ function saveCodeAsPy() {
 }
 
 downloadBtn.addEventListener('click', saveCodeAsPy);
+
+/* ---- and the other ways out, for devices that refuse a download ---- */
+function saveSay(text) {
+  saveOut.hidden = false;
+  saveOut.textContent = text;
+}
+
+function openSaveDialog() {
+  saveOut.hidden = true;
+  saveOut.textContent = '';
+  // Only offered where it actually exists, so it is never a dead button.
+  saveShare.hidden = !canShareFiles();
+  if (typeof saveDialog.showModal === 'function') saveDialog.showModal();
+  else saveDialog.setAttribute('open', '');
+}
+
+saveMoreBtn.addEventListener('click', openSaveDialog);
+
+saveDownload.addEventListener('click', () => {
+  const name = pythonFilename(fileNameInput.value);
+  rememberName(name);
+  const { bytes } = downloadPython(getCode(), name);
+  saveSay(`Asked the browser to save ${name} (${bytes} bytes).\n\nIf nothing appeared, your browser is refusing downloads — use Share or Copy below.`);
+});
+
+saveShare.addEventListener('click', async () => {
+  const name = pythonFilename(fileNameInput.value);
+  rememberName(name);
+  try {
+    const { filename } = await sharePython(getCode(), name);
+    saveSay(`Shared ${filename}.`);
+  } catch (err) {
+    saveSay(`Could not share: ${err.message}\n\nUse Copy instead.`);
+  }
+});
+
+// The same file, but fetched from the server with Content-Disposition: the
+// browser's own download manager handles it, which is the path that keeps
+// working on Android when a blob download is refused. It also leaves the file
+// in your workspace, so it shows up under Files.
+saveServer.addEventListener('click', async () => {
+  const name = pythonFilename(fileNameInput.value);
+  rememberName(name);
+  saveSay(`Saving ${name} on the server…`);
+  try {
+    const blob = new Blob([getCode()], { type: 'text/x-python;charset=utf-8' });
+    const res = await fetch(`/api/files?name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+    const d = await res.json();
+    if (!d.ok) {
+      saveSay(`✗ ${d.error || 'the server refused the file'}`);
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = `/api/files/${encodeURIComponent(name)}`;
+    a.download = name;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+    saveSay(`✓ ${name} is in your workspace, and the browser has been asked to download it.\n\nIt is also listed under Files.`);
+  } catch (err) {
+    saveSay(`Could not reach the server: ${err.message}`);
+  }
+});
+
+saveCopy.addEventListener('click', async () => {
+  try {
+    await copyText(getCode());
+    saveSay('✓ Copied. Paste it wherever you like.');
+  } catch (err) {
+    saveSay(`Could not copy: ${err.message}`);
+  }
+});
 
 // Ctrl/Cmd+S in the editor saves instead of opening the browser's own dialog.
 window.addEventListener('keydown', (e) => {
