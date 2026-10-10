@@ -83,6 +83,17 @@ let receivedEvents = false;
 // True when the run is under a real pseudoterminal, which changes what comes
 // back (raw bytes, not text) and whether we need to echo what you type.
 let runIsPty = false;
+// Silence is ambiguous: a program may be thinking, or it may be waiting for a
+// connection that will never come. Say something rather than show nothing.
+let lastOutputAt = Date.now();
+let quietNoted = false;
+setInterval(() => {
+  if (!runId) { quietNoted = false; return; }
+  if (Date.now() - lastOutputAt < 8000) return;
+  if (quietNoted) return;
+  quietNoted = true;
+  appendOutput('… nothing yet — still running. Press ■ Stop to end it.\n', 'muted');
+}, 2000);
 let spaceTtlHours = 24;
 let filesAtStart = null;
 
@@ -196,6 +207,9 @@ function clearOutput() {
   outputEmpty = true;
 }
 function appendOutput(text, cls) {
+  // A command that is quietly working looks exactly like one that has stopped.
+  // Remember when we last heard anything, so the note below can speak up.
+  if (cls !== 'muted') { lastOutputAt = Date.now(); quietNoted = false; }
   if (outputEmpty) { output.textContent = ''; outputEmpty = false; }
   if (cls === 'err' || cls === 'muted') {
     const d = document.createElement('div');
