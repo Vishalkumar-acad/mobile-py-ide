@@ -2,6 +2,9 @@
 
 :root {
   --bg: #0d1117;
+  /* The console is a terminal, so it gets a proper black — deeper than the
+     app's own background, which is a dark blue-grey. */
+  --term-bg: #000000;
   --bg-elev: #161b22;
   --bg-elev-2: #1f2630;
   --border: #2b323d;
@@ -117,6 +120,7 @@ main {
 }
 .panel { display: none; height: 100%; min-height: 0; }
 .panel.active { display: flex; flex-direction: column; }
+#console { background: var(--term-bg); }
 
 /* editor */
 .editor-bar {
@@ -200,13 +204,13 @@ main {
   gap: 6px;
   padding: 6px 8px;
   border-top: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: var(--term-bg);
 }
 .console-input .prompt { color: var(--accent-2); font-family: var(--mono); font-weight: 700; padding: 0 2px 10px 4px; }
 .console-input textarea {
   flex: 1 1 auto;
   min-width: 0;
-  background: var(--bg);
+  background: var(--term-bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -239,7 +243,7 @@ main {
 .term-mount {
   flex: 1 1 auto;
   min-height: 0;
-  background: #0d1117;
+  background: var(--term-bg);
   padding: 4px 0 4px 6px;
 }
 .term-mount .xterm { height: 100%; }
@@ -260,7 +264,7 @@ main {
 .console-input button:disabled { opacity: 0.4; }
 
 /* prefill */
-.prefill { flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--bg-elev); }
+.prefill { flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--term-bg); }
 .prefill summary {
   cursor: pointer;
   padding: 8px 12px;
@@ -316,7 +320,7 @@ main {
   font-family: var(--mono);
   color: var(--muted);
   border-top: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: var(--term-bg);
   min-height: 20px;
 }
 .status.success { color: var(--accent-2); }
@@ -366,7 +370,7 @@ textarea, input { font-size: 16px; }
   display: flex;
   gap: 4px;
   padding: 6px 8px;
-  background: var(--bg-elev);
+  background: var(--term-bg);
   border-bottom: 1px solid var(--border);
 }
 .modebar .mode {

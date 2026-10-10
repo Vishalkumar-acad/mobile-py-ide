@@ -910,7 +910,7 @@ async function startPtyTerminal(nextMode) {
         cursorBlink: true,
         scrollback: 2000,
         theme: {
-          background: '#0d1117',
+          background: '#000000',
           foreground: '#e6edf3',
           cursor: '#58a6ff',
           selectionBackground: '#264f78',
