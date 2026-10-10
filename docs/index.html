@@ -49,6 +49,57 @@
   kbd { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev-2);
         border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
   footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 20px; color: var(--muted); font-size: 14px; }
+
+  /* ---------- interactive architecture diagram ---------- */
+  .arch { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 18px 0; }
+  .arch-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .arch-tab { font: inherit; font-size: 13px; color: var(--muted); background: var(--bg-elev-2);
+              border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .arch-tab:hover { color: var(--text); border-color: var(--accent); }
+  .arch-tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+  .arch-stage { display: flex; flex-direction: column; align-items: center; }
+  .arch-node { width: 100%; max-width: 440px; text-align: center; cursor: pointer;
+               border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px;
+               background: var(--bg); transition: border-color .18s, box-shadow .18s; }
+  .arch-node b { display: block; font-size: 14px; font-weight: 600; }
+  .arch-node span { display: block; font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+  .arch-node:hover { border-color: var(--accent); }
+  .arch-node[aria-pressed="true"] { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(63,185,80,.22); }
+  .arch-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .arch-link { position: relative; width: 100%; max-width: 440px; height: 56px;
+               display: flex; justify-content: space-around; align-items: stretch; }
+  .arch-lane { position: relative; display: flex; flex-direction: column; align-items: center;
+               justify-content: center; gap: 3px; transition: opacity .18s; }
+  .arch-lane .rail { width: 2px; flex: 1 1 auto; background: var(--border); border-radius: 2px; transition: background .18s; }
+  .arch-lane .tag { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+                    border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; transition: all .18s; }
+  .arch-lane .pulse { position: absolute; left: 50%; margin-left: -3.5px; width: 7px; height: 7px;
+                      border-radius: 50%; background: var(--accent); opacity: 0; }
+  .arch-lane.on .rail { background: var(--accent); }
+  .arch-lane.on .tag { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .arch-lane.on .pulse { opacity: 1; animation: archTravel 1.5s cubic-bezier(.4,0,.6,1) infinite; }
+  .arch-lane.off { opacity: .3; }
+  @keyframes archTravel { 0% { top: 4%; } 100% { top: 86%; } }
+
+  .arch-steps { margin: 18px 0 0; padding-left: 22px; }
+  .arch-steps li { font-size: 14.5px; margin: 5px 0; cursor: pointer; }
+  .arch-steps li:hover { color: var(--accent); }
+  .arch-steps li.on { color: var(--text); font-weight: 600; }
+  .arch-steps li.on::marker { color: var(--accent); }
+  .arch-detail { margin-top: 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+                 background: var(--bg); font-size: 14px; min-height: 62px; }
+  .arch-detail b { color: var(--accent-2); }
+  .arch-hint { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
+  @media (prefers-reduced-motion: reduce) { .arch-lane.on .pulse { animation: none; opacity: 0; } }
+
+  /* Wide tables and long identifiers must not make the whole page scroll
+     sideways on a phone. */
+  @media (max-width: 700px) {
+    table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    code { overflow-wrap: anywhere; }
+  }
 </style>
 </head>
 <body>
@@ -69,6 +120,7 @@
     <a href="#packages">Installing packages</a>
     <a href="#files">Files &amp; storage</a>
     <a href="#blocked">What is blocked</a>
+    <a href="#arch">How it fits together</a>
     <a href="#fix">Troubleshooting</a>
     <a href="#api">API</a>
     <a href="#host">Self-hosting</a>
@@ -236,6 +288,53 @@ print(open("notes.txt").read())</code></pre>
   <tr><td>A change does not seem to have arrived</td><td>Your browser, or a cache in front of the app, may still be holding yesterday's files — which looks exactly like a broken button. Reload the page; if it still looks old, open the site in a private/incognito window. PyPad now stamps every file with the build it came from, so this should look after itself.</td></tr>
 </table>
 
+<h2 id="arch">How it fits together</h2>
+<p>PyPad has two ways to run code, and they travel different paths. Pick one to light it up; tap any box for what it does, or any step to see where it happens.</p>
+
+<div class="arch" id="archWidget">
+  <div class="arch-tabs" role="tablist">
+    <button type="button" class="arch-tab active" data-flow="sse" role="tab">Phone · line by line</button>
+    <button type="button" class="arch-tab" data-flow="ws" role="tab">Desktop · real terminal</button>
+  </div>
+
+  <div class="arch-stage">
+    <div class="arch-node" data-node="browser" data-sub-sse="editor · console" data-sub-ws="editor · console · xterm.js" role="button" tabindex="0">
+      <b>Browser</b><span>editor · console</span>
+    </div>
+
+    <div class="arch-link">
+      <div class="arch-lane" data-flow="sse"><i class="rail"></i><em class="tag">SSE</em><i class="rail"></i><i class="pulse"></i></div>
+      <div class="arch-lane" data-flow="ws"><i class="rail"></i><em class="tag">WebSocket</em><i class="rail"></i><i class="pulse"></i></div>
+    </div>
+
+    <div class="arch-node" data-node="cloudflare" role="button" tabindex="0">
+      <b>Cloudflare</b><span>Access · Tunnel</span>
+    </div>
+
+    <div class="arch-link">
+      <div class="arch-lane" data-flow="sse"><i class="rail"></i><em class="tag">SSE</em><i class="rail"></i><i class="pulse"></i></div>
+      <div class="arch-lane" data-flow="ws"><i class="rail"></i><em class="tag">WebSocket</em><i class="rail"></i><i class="pulse"></i></div>
+    </div>
+
+    <div class="arch-node" data-node="server" data-sub-sse="validator · runs.js · spaces.js" data-sub-ws="validator · pty.js · ws.js" role="button" tabindex="0">
+      <b>Node.js server</b><span>no npm dependencies</span>
+    </div>
+
+    <div class="arch-link">
+      <div class="arch-lane" data-flow="sse"><i class="rail"></i><em class="tag">stdin / stdout</em><i class="rail"></i><i class="pulse"></i></div>
+      <div class="arch-lane" data-flow="ws"><i class="rail"></i><em class="tag">pseudoterminal</em><i class="rail"></i><i class="pulse"></i></div>
+    </div>
+
+    <div class="arch-node" data-node="python" data-sub-sse="python -u your_script.py" data-sub-ws="bash -i under a pty" role="button" tabindex="0">
+      <b>Sandboxed Python</b><span>your workspace</span>
+    </div>
+  </div>
+
+  <ol class="arch-steps" id="archSteps"></ol>
+  <div class="arch-detail" id="archDetail"></div>
+  <p class="arch-hint">The left lane is the phone's path; the right lane is the desktop terminal's. Same server, different transport.</p>
+</div>
+
 <h2 id="api">API</h2>
 <table>
   <tr><th>Method &amp; path</th><th>Purpose</th></tr>
@@ -269,6 +368,94 @@ sudo bash bootstrap.sh</code></pre>
 <footer>
   <p>PyPad — MIT licensed. Source: <a href="https://github.com/Vishalkumar-acad/mobile-py-ide">github.com/Vishalkumar-acad/mobile-py-ide</a></p>
 </footer>
+
+<script>
+(function () {
+  var widget = document.getElementById('archWidget');
+  if (!widget) return;
+
+  var tabs = Array.prototype.slice.call(widget.querySelectorAll('.arch-tab'));
+  var lanes = Array.prototype.slice.call(widget.querySelectorAll('.arch-lane'));
+  var nodes = Array.prototype.slice.call(widget.querySelectorAll('.arch-node'));
+  var stepsEl = document.getElementById('archSteps');
+  var detailEl = document.getElementById('archDetail');
+
+  var NODES = {
+    browser: ['Browser', 'Your editor, the console, and — on a desktop — xterm.js. Nothing runs here: it sends your code and draws what comes back.'],
+    cloudflare: ['Cloudflare', 'Access keeps the IDE private — only invited emails get in — and the Tunnel carries the connection to the server without opening a port on it.'],
+    server: ['Node.js server', 'A small Node.js server with no npm dependencies. It checks your code, starts Python in a sandbox, keeps every visitor\u2019s files separate, and on a desktop runs the pty relay and the WebSocket.'],
+    python: ['Sandboxed Python', 'Your program as a limited subprocess: a memory cap, a time cap, no network, and only your own workspace writable. On a desktop the child runs under a real pseudoterminal instead.'],
+  };
+
+  var STEPS = {
+    sse: [
+      ['browser', 'The browser posts your code to <code>/api/runs</code>.'],
+      ['server', 'The server checks the code, then starts Python as a sandboxed subprocess.'],
+      ['server', 'It replies with a <code>runId</code>.'],
+      ['browser', 'The browser opens an <code>EventSource</code> on <code>/api/runs/:id/events</code>.'],
+      ['python', 'Output arrives as text events, live, as the program prints.'],
+      ['server', '<code>POST /api/runs/:id/input</code> feeds a line to <code>input()</code>.'],
+      ['python', 'An <code>exit</code> event ends the run, and its temporary folder is deleted.'],
+    ],
+    ws: [
+      ['browser', 'The browser posts to <code>/api/runs</code> with <code>pty: true</code> and the terminal size.'],
+      ['server', 'The server writes a small relay that gives the child a real pseudoterminal.'],
+      ['server', 'It replies with a <code>runId</code>.'],
+      ['browser', 'The browser opens a WebSocket to <code>/api/runs/:id/ws</code>.'],
+      ['python', 'Raw bytes come back as binary frames — prompts, colours, cursor movement.'],
+      ['server', 'Keystrokes go the other way as <code>{type:"input"}</code> — including Ctrl+C.'],
+      ['python', 'Closing the relay closes the pty, and the child goes with it.'],
+    ],
+  };
+
+  var flow = 'sse';
+
+  function showNode(id) {
+    var n = NODES[id];
+    if (!n) return;
+    detailEl.innerHTML = '<b>' + n[0] + '</b><br>' + n[1];
+    nodes.forEach(function (el) { el.setAttribute('aria-pressed', String(el.dataset.node === id)); });
+  }
+
+  function render() {
+    tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.flow === flow); });
+    lanes.forEach(function (l) {
+      var on = l.dataset.flow === flow;
+      l.classList.toggle('on', on);
+      l.classList.toggle('off', !on);
+    });
+    nodes.forEach(function (el) {
+      var sub = el.dataset[flow === 'ws' ? 'subWs' : 'subSse'];
+      if (sub) el.querySelector('span').textContent = sub;
+    });
+
+    stepsEl.innerHTML = '';
+    STEPS[flow].forEach(function (pair) {
+      var li = document.createElement('li');
+      li.innerHTML = pair[1];
+      li.dataset.node = pair[0];
+      li.addEventListener('click', function () {
+        showNode(pair[0]);
+        Array.prototype.forEach.call(stepsEl.children, function (c) { c.classList.toggle('on', c === li); });
+      });
+      stepsEl.appendChild(li);
+    });
+    showNode(flow === 'ws' ? 'python' : 'browser');
+  }
+
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { flow = t.dataset.flow; render(); });
+  });
+  nodes.forEach(function (el) {
+    el.addEventListener('click', function () { showNode(el.dataset.node); });
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showNode(el.dataset.node); }
+    });
+  });
+
+  render();
+})();
+</script>
 
 </div>
 </body>
