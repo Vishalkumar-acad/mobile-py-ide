@@ -320,10 +320,37 @@ $('#symbolbar').addEventListener('click', (e) => {
 });
 
 /* --------------------------- console --------------------------------- */
+// The console can take a lot of text in one burst, and appending each piece and
+// scrolling on every one re-lays-out the whole block each time — on a phone that
+// is what makes a chatty program look frozen while it runs. Collect a frame's
+// worth and paint once.
+const paintQueue = [];
+let paintPending = null;
+
 function clearOutput() {
   output.textContent = '';
+  paintQueue.length = 0;
   outputEmpty = true;
 }
+
+function paintOutput() {
+  paintPending = null;
+  if (!paintQueue.length) return;
+  // Follow the tail only if the reader is already there, so scrolling up to
+  // read something is not undone by the next line.
+  const atBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 40;
+  const frag = document.createDocumentFragment();
+  for (const node of paintQueue) frag.appendChild(node);
+  paintQueue.length = 0;
+  output.appendChild(frag);
+  if (atBottom) output.scrollTop = output.scrollHeight;
+}
+
+function queuePaint(node) {
+  paintQueue.push(node);
+  if (paintPending === null) paintPending = requestAnimationFrame(paintOutput);
+}
+
 function appendOutput(text, cls) {
   // A command that is quietly working looks exactly like one that has stopped.
   // Remember when we last heard anything, so the note below can speak up.
@@ -333,16 +360,15 @@ function appendOutput(text, cls) {
     const d = document.createElement('div');
     d.className = cls;
     d.textContent = text;
-    output.appendChild(d);
+    queuePaint(d);
   } else if (cls === 'echo') {
     const s = document.createElement('span');
     s.className = 'echo';
     s.textContent = text;
-    output.appendChild(s);
+    queuePaint(s);
   } else {
-    output.appendChild(document.createTextNode(text));
+    queuePaint(document.createTextNode(text));
   }
-  output.scrollTop = output.scrollHeight;
 }
 function setStatus(kind, text) {
   statusEl.className = `status${kind ? ' ' + kind : ''}`;
@@ -1049,10 +1075,10 @@ function explainError(text) {
     go.addEventListener('click', () => gotoLine(line));
     box.appendChild(go);
   }
+  paintOutput(); // release anything still queued, so the note lands below it
   output.appendChild(box);
   output.scrollTop = output.scrollHeight;
 }
-
 // Put the cursor on a line of the editor, switching to it if we are elsewhere.
 function gotoLine(n) {
   if (mode !== 'script') setMode('script');

@@ -246,6 +246,7 @@
 
 <h2 id="new">What's new</h2>
 <ul>
+  <li><strong>Output appears as it is produced.</strong> A program that prints in a loop used to leave the console blank until it finished — the page was spending all its time re-drawing, and the first line of a long output could be lost. Now the text streams in while the program runs, the beginning is always kept, and scrolling up to read something no longer gets yanked back to the bottom. <a href="#input">Details</a></li>
   <li><strong>The toolbar follows the mode.</strong> In the <strong>Terminal</strong> it carries <strong>↑</strong> and <strong>↓</strong> for command history, <strong>⌃C</strong> to interrupt whatever is running, and shell keys such as <code>|</code> <code>~</code> <code>$</code> — none of which a phone keyboard has. In <strong>Script</strong> and <strong>REPL</strong> it keeps the code tools and gains <strong>⇤</strong> (un-indent), <strong>↶</strong> (undo) and <strong>↷</strong> (redo). <a href="#terminal">Details</a></li>
   <li><strong>Files open in the editor.</strong> Every file under Files now has <strong>Open</strong> and <strong>Rename</strong> beside <strong>Delete</strong>. Open one, edit it, and <strong>Save .py</strong> writes it straight back. <a href="#files">Details</a></li>
   <li><strong>Errors are explained.</strong> When a program fails, one plain sentence appears under the traceback — <em>the line after a colon has to be indented</em>, <em>there is nothing called total yet</em> — with a button to jump to that line. <a href="#input">Details</a></li>
@@ -333,6 +334,7 @@
 <pre><code>name = input("What is your name? ")
 print("Hello,", name, "!")</code></pre>
 <p>Run that, type a name in the console input line, press Enter — and it answers. The typed line is echoed in blue so the transcript reads naturally.</p>
+<p>Output is shown <strong>while the program runs</strong>, not held back until it ends. A program that prints in a loop fills the console line by line as it goes, so you can watch a long job instead of staring at an empty box. The console follows the newest line on its own — but only while you are already at the bottom; scroll up to read something and it stays where you put it.</p>
 <div class="card ok">
   <strong>Pre-filling instead.</strong> If a program asks for several values in a row and you already know them, open <em>Pre-fill input</em> and put one value per line. Those lines are delivered as soon as the run starts, and anything beyond them you can still type live. When the box has content it opens itself and shows a line count, so it is never invisible — and the console echoes what was pre-sent.
 </div>

@@ -14,7 +14,11 @@ import { PTY_DRIVER } from './pty.js';
 import { createTerminalText } from './terminal-text.js';
 
 const runs = new Map();
-const LOG_CAP = 800;
+const LOG_CAP = 4000;
+// How output is batched on its way to the browser: at most one event every
+// OUTPUT_FLUSH_MS, or one as soon as a batch reaches OUTPUT_BATCH_BYTES.
+const OUTPUT_FLUSH_MS = 40;
+const OUTPUT_BATCH_BYTES = 8192;
 // Finished runs are kept briefly (see finalize) so a late subscriber still gets
 // their output; this bounds how many are held.
 const MAX_RETAINED = 100;
@@ -137,6 +141,43 @@ export async function createRun(code, opts = {}) {
     }
   }
 
+  // Output is gathered here and released in batches by the two functions
+  // below, rather than one event per write from the program.
+  const pending = { stdout: '', stderr: '', raw: Buffer.alloc(0) };
+  let flushTimer = null;
+
+  function flushOutput() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (raw) {
+      if (!pending.raw.length) return;
+      const piece = pending.raw;
+      pending.raw = Buffer.alloc(0);
+      // A terminal stream is bytes, not text — the WebSocket sends them as they
+      // are. The same chunk also goes out as cleaned-up text, so the line-based
+      // console (and a browser running an older copy of the page) still gets
+      // something readable instead of nothing at all.
+      emit({
+        type: 'output',
+        raw: true,
+        stream: 'stdout',
+        b64: piece.toString('base64'),
+        text: termText.push(piece),
+      });
+      return;
+    }
+    for (const stream of ['stdout', 'stderr']) {
+      if (!pending[stream]) continue;
+      const text = pending[stream];
+      pending[stream] = '';
+      emit({ type: 'output', stream, text });
+    }
+  }
+
+  function scheduleFlush() {
+    if (flushTimer) return;
+    flushTimer = setTimeout(flushOutput, OUTPUT_FLUSH_MS);
+  }
+
   function killTree(sig = 'SIGKILL') {
     if (run.child && run.child.pid) {
       try { process.kill(-run.child.pid, sig); } catch { /* already gone */ }
@@ -162,6 +203,7 @@ export async function createRun(code, opts = {}) {
     clearTimeout(idleTimer);
     clearTimeout(hardTimer);
     clearTimeout(safetyTimer);
+    flushOutput();
     try { if (run.child && run.child.stdin) run.child.stdin.end(); } catch { /* ignore */ }
     killTree();
 
@@ -216,24 +258,22 @@ export async function createRun(code, opts = {}) {
     }
 
     if (raw) {
-      // A terminal stream is bytes, not text — the WebSocket sends them as they
-      // are. The same chunk also goes out as cleaned-up text, so the line-based
-      // console (and a browser running an older copy of the page) still gets
-      // something readable instead of nothing at all.
-      emit({
-        type: 'output',
-        raw: true,
-        stream: 'stdout',
-        b64: piece.toString('base64'),
-        text: termText.push(piece),
-      });
+      pending.raw = Buffer.concat([pending.raw, piece]);
     } else {
       const text = piece.toString('utf8');
       if (stream === 'stdout') run.stdout += text; else run.stderr += text;
-      emit({ type: 'output', stream, text });
+      pending[stream] += text;
     }
 
+    // A loop printing one character at a time writes one chunk per character,
+    // and a hundred thousand SSE events is more than a phone can draw. Send a
+    // batch instead — on a short timer, or as soon as one grows large.
+    const held = raw ? pending.raw.length : pending.stdout.length + pending.stderr.length;
+    if (held >= OUTPUT_BATCH_BYTES) flushOutput();
+    else scheduleFlush();
+
     if (run.truncated) {
+      flushOutput();
       if (!raw) emit({ type: 'output', stream: 'stderr', text: '\n… output limit reached, stopping.\n' });
       stop('output_limit');
       return;

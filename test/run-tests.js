@@ -258,6 +258,23 @@ check('a carriage-return redraw does not duplicate the line', () => {
   assert.equal(out, '$ echo hi\nhi\n$ ');
 });
 
+console.log('\nStreaming output');
+await checkAsync('a chatty program is batched, and still arrives whole', async () => {
+  const run = await createRun('for i in range(20000):\n    print(i % 10, end="", flush=True)\nprint()\n',
+    { idleMs: 8000, maxMs: 30000 });
+  let out = '';
+  let events = 0;
+  const done = await new Promise((resolve) => {
+    run.subscribe((e) => {
+      if (e.type === 'output' && e.stream === 'stdout') { events++; out += e.text; }
+      if (e.type === 'exit') resolve(e);
+    });
+  });
+  assert.equal(done.status, 'success');
+  assert.equal(out.trim(), '0123456789'.repeat(2000), 'every digit arrives, in order');
+  assert.ok(events < 100, `expected a few batches, not one event per write (got ${events})`);
+});
+
 console.log('\nRenaming a workspace file');
 await fs.mkdir(BASE, { recursive: true });
 await checkAsync('a file is renamed', async () => {
