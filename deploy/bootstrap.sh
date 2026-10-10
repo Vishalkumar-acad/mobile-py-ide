@@ -170,7 +170,7 @@ ReadWritePaths=/tmp ${APP_DIR}/venv ${APP_DIR}/workspace
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 MemoryMax=1024M
 TasksMax=64
 

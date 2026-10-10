@@ -64,6 +64,14 @@ jobs:
           sudo -u mobilepy git -C "$APP_DIR" reset --hard origin/main
 
           echo "==> Restarting service"
+          # Keep the sandbox line in step with the repo. Only this one line is
+          # touched, so any local edits to the unit are left alone.
+          UNIT=/etc/systemd/system/mobile-py-ide.service
+          if [ -f "$UNIT" ] && ! grep -q 'AF_NETLINK' "$UNIT"; then
+            echo "==> Allowing netlink sockets so \`ip\` works in the terminal"
+            sudo sed -i 's/^RestrictAddressFamilies=.*/RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK/' "$UNIT"
+            sudo systemctl daemon-reload
+          fi
           sudo systemctl restart mobile-py-ide
 
           echo "==> Health check"

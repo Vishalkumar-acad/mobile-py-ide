@@ -28,7 +28,10 @@ ReadWritePaths=/tmp /opt/mobile-py-ide/venv /opt/mobile-py-ide/workspace
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# AF_NETLINK is here so `ip` works in the terminal. Without it, `ip -6 route`
+# fails with "Cannot open netlink socket: Address family not supported", which
+# looks exactly like IPv6 being missing when it is not.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 MemoryMax=1024M
 TasksMax=64
 
