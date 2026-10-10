@@ -47,16 +47,56 @@
                border-radius: 8px; padding: 5px 12px; min-height: 32px; }
   .theme-btn:hover { color: var(--accent); border-color: var(--accent); }
   .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; }
-  header.hero { padding: 56px 0 28px; border-bottom: 1px solid var(--border); }
-  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing:-0.5px; }
-  .sub { color: var(--muted); font-size: 17px; margin: 0; }
+  /* ---------- top bar ---------- */
+  .topbar { position: sticky; top: 0; z-index: 30; background: var(--bg);
+            border-bottom: 1px solid var(--border); }
+  @supports (backdrop-filter: blur(6px)) {
+    .topbar { background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(8px); }
+  }
+  .topbar-inner { max-width: 880px; margin: 0 auto; padding: 10px 20px; display: flex;
+                  align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600;
+           color: var(--text); text-decoration: none; }
+  .brand-mark { font-size: 17px; }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; }
+  .tb-link { display: inline-flex; align-items: center; min-height: 32px; font-size: 13px;
+             color: var(--muted); text-decoration: none; border: 1px solid var(--border);
+             border-radius: 8px; padding: 5px 11px; background: var(--bg-elev); }
+  .tb-link:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 42px 0 34px; }
+  .hero h1 { font-size: 36px; margin: 0 0 10px; letter-spacing: -0.6px; }
+  .hero .sub { color: var(--muted); font-size: 17px; margin: 0; max-width: 34em; }
   .pill { display:inline-block; font-size:12px; font-family:var(--mono); color:var(--accent-2);
           border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin-bottom:14px; }
-  nav.toc { display:flex; flex-wrap:wrap; gap:8px; margin: 22px 0 0; }
-  nav.toc a { font-size:13px; color:var(--muted); text-decoration:none; border:1px solid var(--border);
-              border-radius:8px; padding:5px 10px; background:var(--bg-elev); }
-  nav.toc a:hover { color:var(--text); border-color:var(--accent); }
-  h2 { font-size: 23px; margin: 44px 0 12px; padding-top: 8px; }
+  .quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+           gap: 12px; margin-top: 26px; }
+  .quick-card { display: block; text-decoration: none; color: var(--text); background: var(--bg-elev);
+                border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+                transition: border-color .18s, transform .18s; }
+  .quick-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .quick-card b { display: block; font-size: 15px; margin-bottom: 3px; }
+  .quick-card span { display: block; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- contents ---------- */
+  .contents { margin: 0 0 8px; padding: 18px 20px; border: 1px solid var(--border);
+              border-radius: 14px; background: var(--bg-elev); }
+  .contents-title { font-size: 12.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+                    color: var(--muted); margin: 0 0 14px; padding: 0; }
+  .contents-title::before { content: none; }
+  .toc-group + .toc-group { margin-top: 16px; }
+  .toc-group h3 { font-size: 12.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+                  color: var(--muted); margin: 0 0 8px; }
+  .toc-links { display: flex; flex-wrap: wrap; gap: 7px; }
+  .toc-links a { font-size: 13.5px; color: var(--text); text-decoration: none; background: var(--bg);
+                 border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; }
+  .toc-links a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- headings ---------- */
+  h2 { font-size: 24px; margin: 52px 0 14px; letter-spacing: -0.2px; }
+  h2::before { content: ''; display: block; width: 32px; height: 3px; border-radius: 2px;
+               background: var(--accent); margin-bottom: 12px; }
   h3 { font-size: 17px; margin: 26px 0 8px; }
   p, li { font-size: 16px; }
   a { color: var(--accent); }
@@ -65,9 +105,13 @@
   pre { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
         padding: 14px 16px; overflow-x: auto; }
   pre code { background: none; padding: 0; font-size: 13.5px; line-height: 1.55; }
-  table { width:100%; border-collapse: collapse; margin: 14px 0; font-size: 15px; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .4px; }
+  table { width:100%; border-collapse: separate; border-spacing: 0; margin: 16px 0; font-size: 15px;
+          border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td, tr:last-child th { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: var(--bg-elev); }
+  th { background: var(--bg-elev); color: var(--muted); font-weight: 600; font-size: 12.5px;
+       text-transform: uppercase; letter-spacing: .4px; }
   .card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 18px 0; }
   .note { border-left: 3px solid var(--accent); }
   .warn { border-left: 3px solid var(--warning); }
@@ -133,30 +177,66 @@
 </style>
 </head>
 <body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#top"><span class="brand-mark">🐍</span> PyPad</a>
+    <div class="topbar-actions">
+      <a class="tb-link" href="#contents">Contents</a>
+      <button id="themeToggle" class="theme-btn" type="button" aria-label="Switch the theme">☾ Dark</button>
+    </div>
+  </div>
+</header>
+
 <div class="wrap">
 
-<header class="hero">
-  <span class="pill">🐍 PyPad</span>
+<section class="hero" id="top">
+  <span class="pill">Guide</span>
   <h1>How to use PyPad</h1>
-  <p class="sub">A small, safe place to write and run Python from a phone or a desktop browser.</p>
-  <nav class="toc">
-    <a href="#new">What's new</a>
-    <a href="#start">Getting started</a>
-    <a href="#screen">The screen</a>
-    <a href="#modes">Modes</a>
-    <a href="#terminal">Desktop terminal</a>
-    <a href="#input">Input &amp; output</a>
-    <a href="#libraries">Libraries</a>
-    <a href="#packages">Installing packages</a>
-    <a href="#files">Files &amp; storage</a>
-    <a href="#blocked">What is blocked</a>
-    <a href="#arch">How it fits together</a>
-    <a href="#fix">Troubleshooting</a>
-    <a href="#api">API</a>
-    <a href="#host">Self-hosting</a>
-    <button id="themeToggle" class="theme-btn" type="button" aria-label="Switch the theme">☾ Dark</button>
-  </nav>
-</header>
+  <p class="sub">A small, safe place to write and run Python — from a phone or a desktop browser.</p>
+  <div class="quick">
+    <a class="quick-card" href="#start"><b>Write &amp; run</b><span>Type Python, press Run, and watch the output appear.</span></a>
+    <a class="quick-card" href="#terminal"><b>A real terminal</b><span>On a desktop, REPL and Terminal are the real thing.</span></a>
+    <a class="quick-card" href="#screen"><b>Keep your code</b><span>Save it to your device as a <code>.py</code> file.</span></a>
+  </div>
+</section>
+
+<nav class="contents" id="contents" aria-label="Contents">
+  <h2 class="contents-title">Contents</h2>
+  <div class="toc-group">
+    <h3>Using PyPad</h3>
+    <div class="toc-links">
+      <a href="#new">What's new</a>
+      <a href="#start">Getting started</a>
+      <a href="#screen">The screen</a>
+      <a href="#modes">Modes</a>
+      <a href="#terminal">Desktop terminal</a>
+      <a href="#input">Input &amp; output</a>
+    </div>
+  </div>
+  <div class="toc-group">
+    <h3>Beyond the basics</h3>
+    <div class="toc-links">
+      <a href="#libraries">Libraries</a>
+      <a href="#packages">Installing packages</a>
+      <a href="#files">Files &amp; storage</a>
+      <a href="#blocked">What is blocked</a>
+    </div>
+  </div>
+  <div class="toc-group">
+    <h3>Under the hood</h3>
+    <div class="toc-links">
+      <a href="#arch">How it fits together</a>
+      <a href="#api">API</a>
+      <a href="#fix">Troubleshooting</a>
+    </div>
+  </div>
+  <div class="toc-group">
+    <h3>Running it</h3>
+    <div class="toc-links">
+      <a href="#host">Self-hosting</a>
+    </div>
+  </div>
+</nav>
 
 <h2 id="new">What's new</h2>
 <ul>
