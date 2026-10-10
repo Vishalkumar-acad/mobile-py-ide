@@ -80,6 +80,9 @@ let runId = null;
 let outputEmpty = true;
 let mode = 'script';
 let receivedEvents = false;
+// True when the run is under a real pseudoterminal, which changes what comes
+// back (raw bytes, not text) and whether we need to echo what you type.
+let runIsPty = false;
 let spaceTtlHours = 24;
 let filesAtStart = null;
 
@@ -305,6 +308,7 @@ async function startRun() {
   }
 
   runId = data.runId;
+  runIsPty = Boolean(data.pty);
   runBtn.disabled = false;
   setRunning(true);
   if (mode === 'repl') setStatus('running', 'REPL ready — type below and press Enter');
@@ -322,7 +326,8 @@ function openStream(id) {
     try { e = JSON.parse(ev.data); } catch { return; }
     receivedEvents = true;
     if (e.type === 'output') {
-      appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
+      if (e.raw) appendOutput(terminalText(e.b64), null);
+      else appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
     } else if (e.type === 'exit') {
       finishRun(e);
     }
@@ -396,6 +401,7 @@ function resetRun() {
   if (termWs) { try { termWs.close(); } catch { /* ignore */ } termWs = null; }
   runId = null;
   termRunId = null;
+  runIsPty = false;
   receivedEvents = false;
   setRunning(false);
   setStatus('', '');
@@ -444,7 +450,9 @@ inputForm.addEventListener('submit', async (e) => {
   const value = inputLine.value;
   inputLine.value = '';
   inputLine.style.height = '';
-  appendOutput((mode === 'terminal' ? '$ ' : '') + value + '\n', 'echo');
+  // A pseudoterminal echoes what you type by itself, so our own echo would
+  // double every line. The line-based runs have no echo of their own.
+  if (!runIsPty) appendOutput((mode === 'terminal' ? '$ ' : '') + value + '\n', 'echo');
   try {
     await fetch(`/api/runs/${runId}/input`, {
       method: 'POST',
@@ -456,6 +464,45 @@ inputForm.addEventListener('submit', async (e) => {
 });
 
 runBtn.addEventListener('click', onRunClick);
+
+/* -------------------- terminal bytes, for the text console ------------ */
+// The terminal runs under a real pseudoterminal, so its output arrives as
+// bytes carrying the escape sequences a terminal would use. This turns them
+// back into something the line-based console can show.
+const termBytesDecoder = new TextDecoder();
+let termBytesPending = '';
+
+// Is this a complete escape sequence, or has one been split across two chunks?
+function escapeIsComplete(seq) {
+  return /^\x1b\[[0-9;?]*[ -/]*[@-~]/.test(seq)          // CSI
+    || /^\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/.test(seq)     // OSC
+    || /^\x1b[()][A-Za-z0-9]/.test(seq)                   // charset
+    || /^\x1b[@-Z\\-_]/.test(seq);                        // two-byte escape
+}
+
+function terminalText(b64) {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  let s = termBytesPending + termBytesDecoder.decode(bytes, { stream: true });
+  termBytesPending = '';
+
+  // Hold back an escape sequence that is still arriving.
+  const cut = s.lastIndexOf('\x1b');
+  if (cut !== -1 && !escapeIsComplete(s.slice(cut))) {
+    termBytesPending = s.slice(cut);
+    s = s.slice(0, cut);
+  }
+
+  s = s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, ''); // OSC … BEL/ST
+  s = s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '');           // CSI
+  s = s.replace(/\x1b[()][A-Za-z0-9]/g, '');                 // charset
+  s = s.replace(/\x1b[@-Z\\-_]/g, '');                       // the rest
+  s = s.replace(/\r\n\r/g, '\r\n');                          // the pty's stray CR
+  s = s.replace(/\r(?!\n)/g, '\n');                          // a lone CR is a redraw
+  s = s.replace(/\r\n/g, '\n');
+  s = s.replace(/[^\n]\x08/g, '');                           // backspace erases
+  s = s.replace(/\x08/g, '');
+  return s;
+}
 
 /* --------------------------- save as .py ----------------------------- */
 // Entirely client side: the code is wrapped in a Blob and handed straight to

@@ -287,6 +287,7 @@
   <tr><td><strong>Terminal</strong></td><td>A shell on the server. Type a command, press Enter, read its output. Only shown if it has been enabled.</td></tr>
 </table>
 <p><strong>On a laptop or desktop</strong>, REPL and Terminal open as a <em>real</em> terminal: you type straight at the <code>$</code> or <code>&gt;&gt;&gt;</code> prompt, with arrow-key history, tab completion and Ctrl+C to interrupt — and no Send button. On a phone they stay line-by-line, with the input box you can move above or below the output. Full details in <a href="#terminal">The desktop terminal</a>.</p>
+<p>The <strong>Terminal</strong> runs under a real terminal on a phone too — it is only <em>drawn</em> differently. That matters for programs that ask "am I a terminal?": <code>ssh</code>, <code>top</code>, <code>python -i</code> and friends behave properly instead of refusing.</p>
 <div class="card warn">
   <strong>About the terminal.</strong> Terminal mode is a real shell on the server, so it is <em>off by default</em>. It is only safe while the IDE stays private (for example behind Cloudflare Access). Turn it on from GitHub — Actions &rarr; <em>Run server setup</em> &rarr; set <code>allow_terminal</code> to <code>true</code> — or add <code>ALLOW_TERMINAL=true</code> to <code>/opt/mobile-py-ide/.env</code> and restart the service.
 </div>
@@ -308,6 +309,7 @@
 <p>There is no Send button here: <kbd>Enter</kbd> is the only key you need. The input box and the <strong>⇅</strong> button stay on phones, where they are the right tool.</p>
 <p>Inside the terminal, <code>python3</code> and <code>pip</code> are the IDE's own interpreter — not the system one — so <code>pip list</code>, <code>pip install</code> and <code>pip uninstall</code> typed there act on exactly the packages your code imports.</p>
 <p>On a narrow screen the real terminal is not used at all — you get the lighter line-by-line console, which is kinder to a phone's memory and battery and starts instantly. If the terminal cannot load for any reason, a desktop quietly falls back to that same console.</p>
+<p>That lighter console is still a real terminal underneath: the same pseudoterminal, with its escape codes cleaned back into plain text. So on a phone too, a program that checks whether it has a terminal gets the right answer — which is what <code>ssh</code>, <code>top</code> and <code>python -i</code> need. What you give up on a phone is the terminal's own line editing (arrow-key history, Ctrl+C); the <strong>■ Stop</strong> button ends the session instead.</p>
 <div class="card ok">
   <strong>How it works.</strong> The run happens under a real pseudoterminal, so the program behaves exactly as it would in a terminal window — prompts, colours, line editing and all — and the terminal itself is drawn by <a href="https://xtermjs.org/">xterm.js</a>. Nothing native is installed on the server for this: it is a small Python relay plus a hand-written WebSocket, so the project keeps its no-dependency promise.
 </div>
@@ -398,6 +400,7 @@ print(open("notes.txt").read())</code></pre>
   <tr><td>The old session keeps answering after you switch mode</td><td>Changing mode ends the previous session. Press <strong>▶ Run</strong> to start the new one.</td></tr>
   <tr><td>Save .py does nothing</td><td>Some browsers — and most in-app webviews — refuse a download started by a page. Tap <strong>⋯</strong> beside the button and use <strong>Download via server</strong>, <strong>Share</strong>, or <strong>Copy code</strong>. Copy works everywhere; Share opens your phone's own save menu.</td></tr>
   <tr><td>A change does not seem to have arrived</td><td>Your browser, or a cache in front of the app, may still be holding yesterday's files — which looks exactly like a broken button. Reload the page; if it still looks old, open the site in a private/incognito window. PyPad now stamps every file with the build it came from, so this should look after itself.</td></tr>
+  <tr><td><code>Pseudo-terminal will not be allocated because stdin is not a terminal</code></td><td>The program wants a terminal and did not get one. This used to happen in Terminal mode on a phone, because the shell was given a pipe; Terminal now runs under a real pseudoterminal everywhere, so it should be gone. If you still see it, <code>ssh -tt …</code> forces one.</td></tr>
 </table>
 
 <h2 id="arch">How it fits together</h2>

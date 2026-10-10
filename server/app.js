@@ -249,10 +249,18 @@ function resolveMode(payload) {
 
   if (mode === 'terminal') {
     if (!config.allowTerminal) return { error: 'Terminal mode is turned off on this server.' };
-    const opts = wantPty
-      ? { kind: 'pty', ptyCmd: 'bash -i', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb }
-      : { kind: 'bash', idleMs: config.replIdleMs, maxMs: config.replMaxMs, memoryMb: config.terminalMemoryMb };
-    return { mode, code: '', opts, skipValidation: true, pty: wantPty };
+    // Always under a real pseudoterminal, phone or desktop. Interactive
+    // programs — ssh, top, python -i, anything that asks "am I a tty?" — need a
+    // terminal on their stdin, and a pipe is not one. The desktop draws the
+    // bytes with xterm.js; the phone gets the same bytes cleaned back to text.
+    const opts = {
+      kind: 'pty',
+      ptyCmd: 'bash -i',
+      idleMs: config.replIdleMs,
+      maxMs: config.replMaxMs,
+      memoryMb: config.terminalMemoryMb,
+    };
+    return { mode, code: '', opts, skipValidation: true, pty: true };
   }
   if (mode === 'repl') {
     const opts = wantPty
