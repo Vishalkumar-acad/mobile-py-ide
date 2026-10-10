@@ -208,6 +208,19 @@ Inside the terminal the venv's `bin` is first on `PATH`, so `python3` and `pip`
 there mean the same interpreter the IDE installs packages into — a typed
 `pip uninstall` hits the right environment.
 
+## Never serve a stale build
+
+`index.html` is served with `?v=<build>` on every local asset, and `main.js`
+carries the same stamp on to the files it imports. The stamp is a hash of the
+front-end files' sizes and mtimes, so a deploy is a new URL that nothing can
+have cached.
+
+This matters more than it sounds. Cloudflare caches `.js` and `.css` by
+extension and can override an origin's `Cache-Control`, so a fix can ship
+correctly and still never reach a browser — which looks exactly like the fix
+not working. Stamped URLs sidestep the whole question, and let stamped assets
+be cached `immutable` for a year. `index.html` itself is sent `no-store`.
+
 ## Packages
 
 `GET /api/packages/installed` lists what is in the venv (pip's own scaffolding

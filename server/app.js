@@ -17,6 +17,7 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import config from './config.js';
 import { validate } from './validator.js';
@@ -148,6 +149,40 @@ function releaseSlot() {
 }
 
 // --- static files -------------------------------------------------------
+// A build stamp for the front-end assets.
+//
+// Without one, a deploy can leave a browser — or a CDN in front of it — serving
+// yesterday's JavaScript, which looks exactly like a feature that does not
+// work. Cloudflare in particular caches .js and .css by extension and can
+// override an origin's Cache-Control. So index.html is served with
+// ?v=<stamp> on every local asset: a new build is a new URL, which nothing can
+// have cached, and the assets themselves can then be cached forever.
+let ASSET_VERSION = 'dev';
+
+async function computeAssetVersion() {
+  const names = ['index.html', 'main.js', 'style.css', 'download.js', 'manifest.webmanifest'];
+  const parts = [];
+  for (const name of names) {
+    try {
+      const st = await fs.stat(path.join(PUBLIC_DIR, name));
+      parts.push(`${name}:${st.size}:${Math.round(st.mtimeMs)}`);
+    } catch { /* a missing file just does not contribute */ }
+  }
+  return crypto.createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 12);
+}
+
+computeAssetVersion().then((v) => { ASSET_VERSION = v; }).catch(() => {});
+
+// Add ?v=<stamp> to local references in the HTML. External URLs, data: URIs and
+// bare fragments are left alone.
+function stampAssets(html) {
+  return html.replace(/(src|href)="([^"]+)"/g, (whole, attr, url) => {
+    if (/^(https?:|\/\/|data:|mailto:|#)/i.test(url)) return whole;
+    const join = url.includes('?') ? '&' : '?';
+    return `${attr}="${url}${join}v=${ASSET_VERSION}"`;
+  });
+}
+
 async function serveStatic(req, res) {
   let urlPath;
   try {
@@ -169,11 +204,22 @@ async function serveStatic(req, res) {
   try {
     const stat = await fs.stat(resolved);
     if (stat.isDirectory()) throw new Error('is a directory');
-    const data = await fs.readFile(resolved);
+    let data = await fs.readFile(resolved);
+    const isHtml = path.extname(resolved).toLowerCase() === '.html';
+    if (isHtml) data = Buffer.from(stampAssets(data.toString('utf8')), 'utf8');
+
+    // An asset asked for at a stamped URL is immutable, so it can live in the
+    // cache for good. Anything else has to be checked every time.
+    const stamped = Boolean(new URL(req.url, 'http://localhost').searchParams.get('v'));
+    const cacheControl = isHtml
+      ? 'no-store, no-cache, must-revalidate'
+      : (stamped ? 'public, max-age=31536000, immutable' : 'no-cache');
+
     res.writeHead(200, {
       'Content-Type': MIME[path.extname(resolved).toLowerCase()] || 'application/octet-stream',
       'Content-Length': data.length,
-      'Cache-Control': 'no-cache',
+      'Cache-Control': cacheControl,
+      ...(isHtml ? { Pragma: 'no-cache', Expires: '0' } : {}),
       ...SECURITY_HEADERS,
     });
     res.end(data);

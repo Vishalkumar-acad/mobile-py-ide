@@ -5,7 +5,17 @@
 // input() works live: the program prints a prompt, you type a line and press
 // Enter, and it continues — just like a terminal.
 
-import { downloadPython, pythonFilename, canShareFiles, sharePython, copyText } from './download.js';
+// index.html loads us as main.js?v=<build>. Carry that same stamp to the files
+// we import, or a cached copy of one of them could still be served after a
+// deploy — which is exactly how a fix can look like it did not work.
+const BUILD_QUERY = new URL(import.meta.url).search;
+let dl;
+try {
+  dl = await import(`./download.js${BUILD_QUERY}`);
+} catch {
+  dl = await import('./download.js'); // unstamped fallback
+}
+const { downloadPython, pythonFilename, canShareFiles, sharePython, copyText } = dl;
 
 const DEFAULT_CODE = `# Mobile Py IDE — a live console
 name = input("What is your name? ")
