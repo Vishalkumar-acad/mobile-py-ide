@@ -89,10 +89,12 @@ let lastOutputAt = Date.now();
 let quietNoted = false;
 setInterval(() => {
   if (!runId) { quietNoted = false; return; }
-  if (Date.now() - lastOutputAt < 8000) return;
+  if (Date.now() - lastOutputAt < 10000) return;
   if (quietNoted) return;
   quietNoted = true;
-  appendOutput('… nothing yet — still running. Press ■ Stop to end it.\n', 'muted');
+  // Worded as information, not as a fault: sitting at a prompt is a perfectly
+  // healthy silence, and this should not read like an error.
+  appendOutput('… waiting — the session is still open. ■ Stop ends it.\n', 'muted');
 }, 2000);
 let spaceTtlHours = 24;
 let filesAtStart = null;
