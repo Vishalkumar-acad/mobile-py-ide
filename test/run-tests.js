@@ -8,7 +8,7 @@ import { execute } from '../server/executor.js';
 import { createRun } from '../server/runs.js';
 import { REPL_SOURCE } from '../server/modes.js';
 import { isAllowed, uninstallPackage, listInstalled } from '../server/packages.js';
-import { safePath, writeFile, readFile, deleteFile } from '../server/files.js';
+import { safePath, writeFile, readFile, deleteFile, renameFile } from '../server/files.js';
 import { makeToken, readToken, spaceDir, sweep } from '../server/spaces.js';
 import config from '../server/config.js';
 import { pythonFilename, PYTHON_MIME } from '../public/download.js';
@@ -256,6 +256,30 @@ check('a carriage-return redraw does not duplicate the line', () => {
   const t = createTerminalText();
   const out = t.push(Buffer.from('$ echo hi\r\n\rhi\r\n$ ', 'utf8'));
   assert.equal(out, '$ echo hi\nhi\n$ ');
+});
+
+console.log('\nRenaming a workspace file');
+await fs.mkdir(BASE, { recursive: true });
+await checkAsync('a file is renamed', async () => {
+  await fs.writeFile(`${BASE}/old.py`, 'x = 1\n');
+  const r = await renameFile(BASE, 'old.py', 'new.py');
+  assert.equal(r.ok, true);
+  assert.equal(await fs.readFile(`${BASE}/new.py`, 'utf8'), 'x = 1\n');
+});
+await checkAsync('renaming onto a name already in use is refused', async () => {
+  await fs.writeFile(`${BASE}/taken.py`, 'a\n');
+  const r = await renameFile(BASE, 'new.py', 'taken.py');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /already exists/);
+  assert.equal(await fs.readFile(`${BASE}/new.py`, 'utf8'), 'x = 1\n', 'the original is untouched');
+});
+await checkAsync('a name that climbs out of the workspace is refused', async () => {
+  const r = await renameFile(BASE, 'new.py', '../escape.py');
+  assert.equal(r.ok, false);
+});
+await checkAsync('renaming a file that is not there is refused', async () => {
+  const r = await renameFile(BASE, 'nope.py', 'x.py');
+  assert.equal(r.ok, false);
 });
 
 console.log('\nSaving code as a file');

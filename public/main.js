@@ -75,11 +75,15 @@ const fileOut = $('#fileOut');
 
 let cmView = null;
 let usingCM = false;
+// The editor commands (undo, redo, indent) — loaded with CodeMirror.
+let cmCommands = null;
 let es = null;
 let runId = null;
 let outputEmpty = true;
 let mode = 'script';
 let receivedEvents = false;
+// What the current run wrote to stderr, so a traceback can be read back later.
+let runStderr = '';
 // True when the run is under a real pseudoterminal, which changes what comes
 // back (raw bytes, not text) and whether we need to echo what you type.
 let runIsPty = false;
@@ -122,17 +126,27 @@ function saveCode() {
 async function initEditor() {
   const initial = loadStored(STORAGE_CODE, DEFAULT_CODE);
   try {
-    const [cm, py, theme] = await Promise.all([
+    const [cm, py, theme, commands, lang] = await Promise.all([
       import('https://esm.sh/codemirror@6.0.1'),
       import('https://esm.sh/@codemirror/lang-python@6.1.6'),
       import('https://esm.sh/@codemirror/theme-one-dark@6.1.2'),
+      // Again the specifier basicSetup itself uses: undo and redo act on the
+      // history that instance owns, so a second copy would do nothing.
+      import('https://esm.sh/@codemirror/commands@^6.0.0?target=es2022'),
+      // The exact specifier @codemirror/lang-python itself imports — a different
+      // one would be a second copy of the package, and its settings ignored.
+      import('https://esm.sh/@codemirror/language@^6.8.0?target=es2022'),
     ]);
+    cmCommands = commands;
 
     cmView = new cm.EditorView({
       doc: initial,
       extensions: [
         cm.basicSetup,
         py.python(),
+        // Without this the editor indents new lines by two spaces while the Tab
+        // button inserts four, and the file ends up with both.
+        lang.indentUnit.of('    '),
         theme.oneDark,
         cm.EditorView.lineWrapping,
         cm.EditorView.theme({
@@ -175,7 +189,23 @@ function switchTab(name) {
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
 /* ------------------------- symbol toolbar ----------------------------- */
+// Where the toolbar types: the editor in Script mode, the console's input line
+// in REPL and Terminal — where the editor is hidden, so typing at it would go
+// nowhere visible.
+function targetIsInput() { return mode !== 'script'; }
+
+function insertAtCursor(el, text, back) {
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? start;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  const pos = Math.max(0, start + text.length - back);
+  el.selectionStart = el.selectionEnd = pos;
+  el.focus();
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function insertText(text, back = 0) {
+  if (targetIsInput()) { insertAtCursor(inputLine, text, back); return; }
   if (usingCM) {
     cmView.dispatch(cmView.state.replaceSelection(text));
     if (back) {
@@ -184,22 +214,108 @@ function insertText(text, back = 0) {
     }
     cmView.focus();
   } else {
-    const el = fallback;
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    el.value = el.value.slice(0, start) + text + el.value.slice(end);
-    const pos = start + text.length - back;
-    el.selectionStart = el.selectionEnd = pos;
-    el.focus();
+    insertAtCursor(fallback, text, back);
   }
   saveCode();
 }
 
+// One of CodeMirror's own commands. Returns false when there is no editor, so
+// the caller can fall back.
+function editorCommand(name) {
+  if (!usingCM || !cmCommands) return false;
+  const fn = cmCommands[name];
+  if (typeof fn !== 'function') return false;
+  fn(cmView);
+  cmView.focus();
+  saveCode();
+  return true;
+}
+
+// Take one indent level off, on every line the cursor or selection touches.
+// Written here rather than using the editor's own indentLess, which would take
+// off two spaces where the Tab button puts four.
+function unindent() {
+  if (!usingCM) { unindentFallback(); return; }
+  const { state } = cmView;
+  const changes = [];
+  const seen = new Set();
+  for (const range of state.selection.ranges) {
+    const first = state.doc.lineAt(range.from).number;
+    const last = state.doc.lineAt(range.to).number;
+    for (let n = first; n <= last; n++) {
+      if (seen.has(n)) continue;
+      seen.add(n);
+      const line = state.doc.line(n);
+      const strip = line.text.match(/^\t|^ {1,4}/);
+      if (strip) changes.push({ from: line.from, to: line.from + strip[0].length });
+    }
+  }
+  if (!changes.length) return;
+  cmView.dispatch({ changes });
+  cmView.focus();
+  saveCode();
+}
+
+// The same thing for the plain-textarea editor.
+function unindentFallback() {
+  const el = fallback;
+  const pos = el.selectionStart ?? 0;
+  const lineStart = el.value.lastIndexOf('\n', pos - 1) + 1;
+  const strip = el.value.slice(lineStart, lineStart + 4).match(/^\t|^ {1,4}/);
+  if (!strip) return;
+  const n = strip[0].length;
+  el.value = el.value.slice(0, lineStart) + el.value.slice(lineStart + n);
+  el.selectionStart = el.selectionEnd = Math.max(lineStart, pos - n);
+  el.focus();
+  saveCode();
+}
+
+/* ------------------- shell history, and Ctrl+C ------------------------ */
+// A phone keyboard has no arrow keys and no Ctrl+C, so the toolbar provides
+// them. History is kept here rather than read back from the shell.
+const shellHistory = [];
+let shellAt = -1;
+
+function shellRemember(line) {
+  const t = line.trim();
+  if (!t) return;
+  if (shellHistory[shellHistory.length - 1] !== t) shellHistory.push(t);
+  if (shellHistory.length > 100) shellHistory.shift();
+  shellAt = -1;
+}
+
+function shellHistoryStep(delta) {
+  if (!shellHistory.length) return;
+  if (shellAt === -1) shellAt = shellHistory.length;
+  shellAt = Math.max(0, Math.min(shellHistory.length, shellAt + delta));
+  inputLine.value = shellAt >= shellHistory.length ? '' : shellHistory[shellAt];
+  inputLine.dispatchEvent(new Event('input', { bubbles: true }));
+  inputLine.focus();
+}
+
+// A bare 0x03 and no newline: that is what makes the terminal driver raise
+// SIGINT, instead of reading it as an empty line.
+async function sendCtrlC() {
+  if (!runId) return;
+  try {
+    await fetch(`/api/runs/${runId}/input`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: '\u0003', raw: true }),
+    });
+  } catch { /* ignore */ }
+}
+
 $('#symbolbar').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
-  if (!btn) return;
+  if (!btn || btn.hidden) return;
   e.preventDefault();
+  if (btn.dataset.hist) { shellHistoryStep(btn.dataset.hist === 'up' ? -1 : 1); return; }
+  if (btn.dataset.ctrl === 'c') { sendCtrlC(); return; }
   if (btn.dataset.key === 'tab') { insertText('    '); return; }
+  if (btn.dataset.key === 'untab') { unindent(); return; }
+  if (btn.dataset.key === 'undo') { editorCommand('undo'); return; }
+  if (btn.dataset.key === 'redo') { editorCommand('redo'); return; }
   if (btn.dataset.insert !== undefined) insertText(btn.dataset.insert, Number(btn.dataset.back || 0));
 });
 
@@ -325,6 +441,7 @@ async function startRun() {
 
   runId = data.runId;
   runIsPty = Boolean(data.pty);
+  runStderr = '';
   runBtn.disabled = false;
   setRunning(true);
   if (mode === 'repl') setStatus('running', 'REPL ready — type below and press Enter');
@@ -342,6 +459,7 @@ function openStream(id) {
     try { e = JSON.parse(ev.data); } catch { return; }
     receivedEvents = true;
     if (e.type === 'output') {
+      if (e.stream === 'stderr') runStderr += e.text;
       appendOutput(e.text, e.stream === 'stderr' ? 'err' : null);
     } else if (e.type === 'exit') {
       finishRun(e);
@@ -382,6 +500,7 @@ function finishRun(e) {
   else if (e.status === 'killed') setStatus('error', `■ Stopped${t}`);
   else setStatus('error', `✗ Error${t} · exit ${e.exit_code ?? '?'}`);
   if (e.truncated) appendOutput('\n… output truncated.', 'muted');
+  if (e.status === 'error' || e.status === 'output_limit') explainError(runStderr);
 }
 
 // After a run, say so if the program saved anything — otherwise it is easy to
@@ -465,6 +584,7 @@ inputForm.addEventListener('submit', async (e) => {
   const value = inputLine.value;
   inputLine.value = '';
   inputLine.style.height = '';
+  if (mode === 'terminal' || mode === 'repl') shellRemember(value);
   // A pseudoterminal echoes what you type by itself, so our own echo would
   // double every line. The line-based runs have no echo of their own.
   if (!runIsPty) appendOutput((mode === 'terminal' ? '$ ' : '') + value + '\n', 'echo');
@@ -637,6 +757,11 @@ function setMode(next) {
   if (next === 'script' && usingCM) setTimeout(() => cmView.requestMeasure(), 0);
   resetRun();
   clearOutput();
+  // The toolbar changes with the mode: shell keys in the terminal, code tools
+  // in Script and REPL.
+  const set = next === 'terminal' ? 'shell' : 'code';
+  document.querySelectorAll('#symbolbar .sym-set').forEach((s) => { s.hidden = s.dataset.set !== set; });
+  document.querySelectorAll('#symbolbar [data-only="script"]').forEach((b) => { b.hidden = next !== 'script'; });
   const hint = next === 'script' ? 'Press ▶ Run to execute your code.'
     : next === 'repl' ? 'Press ▶ Run to start a Python REPL, then type below.'
       : 'Press ▶ Run to open a terminal, then type commands below.';
@@ -771,6 +896,20 @@ async function loadFiles() {
       const size = document.createElement('span');
       size.className = 'file-size';
       size.textContent = fmtSize(f.size);
+
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'mini-btn';
+      open.textContent = 'Open';
+      open.title = 'Open this file in the editor';
+      open.addEventListener('click', () => openInEditor(f));
+
+      const ren = document.createElement('button');
+      ren.type = 'button';
+      ren.className = 'mini-btn';
+      ren.textContent = 'Rename';
+      ren.addEventListener('click', () => startRename(f, row));
+
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'mini-btn';
@@ -779,7 +918,7 @@ async function loadFiles() {
         await fetch(`/api/files/${encodeURIComponent(f.name)}`, { method: 'DELETE' }).catch(() => {});
         loadFiles();
       });
-      row.append(a, size, del);
+      row.append(a, size, open, ren, del);
       fileList.appendChild(row);
     });
     const total = document.createElement('div');
@@ -788,6 +927,151 @@ async function loadFiles() {
     fileList.appendChild(total);
   } catch {
     /* ignore */
+  }
+}
+
+/* --------------------- opening a file in the editor ------------------- */
+// Files and the editor belong together: open one here, edit it, and Save .py
+// writes it back to the workspace under the name in the box.
+const MAX_OPEN_BYTES = 512 * 1024;
+
+function fileSay(text, bad) {
+  fileOut.hidden = false;
+  fileOut.className = bad ? 'pkg-out err' : 'pkg-out ok';
+  fileOut.textContent = text;
+}
+
+async function openInEditor(f) {
+  if (f.size > MAX_OPEN_BYTES) {
+    fileSay(`${f.name} is ${fmtSize(f.size)} — too big to open here. Download it instead.`, true);
+    return;
+  }
+  try {
+    const res = await fetch(`/api/files/${encodeURIComponent(f.name)}`);
+    if (!res.ok) throw new Error(`the server answered ${res.status}`);
+    const text = await res.text();
+    if (/\u0000/.test(text.slice(0, 4000))) {
+      fileSay(`${f.name} does not look like a text file. Download it instead.`, true);
+      return;
+    }
+    setCode(text);
+    fileNameInput.value = f.name;
+    rememberName(f.name);
+    filesDialog.close();
+    switchTab('code');
+    setStatus('success', `Opened ${f.name}. Edit it, then Save .py to write it back.`);
+  } catch (err) {
+    fileSay(`Could not open ${f.name}: ${err.message}`, true);
+  }
+}
+
+// Rename in place, in the row itself — a system prompt would be clumsier on a
+// phone and is blocked in some webviews.
+function startRename(f, row) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'file-rename';
+  input.value = f.name;
+  input.setAttribute('aria-label', `New name for ${f.name}`);
+  row.textContent = '';
+  row.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return;
+    done = true;
+    const to = input.value.trim();
+    if (!commit || !to || to === f.name) { loadFiles(); return; }
+    try {
+      const res = await fetch('/api/files/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: f.name, to }),
+      });
+      const d = await res.json();
+      if (!d.ok) fileSay(d.error || 'Could not rename it.', true);
+    } catch (err) {
+      fileSay(`Could not rename it: ${err.message}`, true);
+    }
+    loadFiles();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+/* ------------------- explaining what went wrong ----------------------- */
+// A traceback is accurate but hard to read, and its line numbers point at a
+// temporary file. Turn the common ones into one plain sentence, and offer to
+// jump to the line in the editor.
+const ERROR_HINTS = [
+  [/IndentationError: unexpected indent/, 'this line is indented further than the block it belongs to — line it up with the lines above'],
+  [/IndentationError: expected an indented block/, 'the line after a colon (:) has to be indented — press ⇥ Tab on it'],
+  [/TabError/, 'indentation is mixed: some lines use spaces and some use tabs. Make them all spaces'],
+  [/SyntaxError/, 'Python could not read this line — something is missing or extra, such as a bracket, a quote, or the colon at the end of an if/for/while line'],
+  [/NameError: name '([^']+)' is not defined/, (m) => `there is nothing called ${m[1]} yet — check the spelling, or create it before this line`],
+  [/TypeError: can only concatenate str/, 'text and a number cannot be joined with + — wrap the number in str(…), or use an f-string'],
+  [/TypeError: unsupported operand type/, 'these two values cannot be combined with that operator — often a number and a piece of text'],
+  [/ValueError: invalid literal for int\(\) with base 10: '([^']*)'/, (m) => `int() was given ${JSON.stringify(m[1])}, which is not a whole number — use input() for text, int(input()) only for digits`],
+  [/ZeroDivisionError/, 'something was divided by zero'],
+  [/IndexError: list index out of range/, 'that position is past the end of the list — remember the first item is 0'],
+  [/KeyError: (.+)/, (m) => `that key is not in the dictionary: ${m[1]}`],
+  [/FileNotFoundError/, 'that file is not in the workspace — check the name under Files'],
+  [/ModuleNotFoundError: No module named '([^']+)'/, (m) => `${m[1]} is not installed — open Packages and add it`],
+  [/RecursionError/, 'a function keeps calling itself and never stops'],
+];
+
+function explainError(text) {
+  if (!text) return;
+  const lines = [...text.matchAll(/line (\d+)/g)].map((m) => Number(m[1]));
+  const line = lines.length ? lines[lines.length - 1] : null;
+  let hint = null;
+  for (const [re, msg] of ERROR_HINTS) {
+    const m = text.match(re);
+    if (m) { hint = typeof msg === 'function' ? msg(m) : msg; break; }
+  }
+  if (!hint && !line) return;
+
+  const box = document.createElement('div');
+  box.className = 'err-help';
+  const label = document.createElement('span');
+  label.textContent = line ? `Line ${line}: ${hint || 'look at the message above.'}` : hint;
+  box.appendChild(label);
+  if (line) {
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'mini-btn';
+    go.textContent = `Go to line ${line}`;
+    go.addEventListener('click', () => gotoLine(line));
+    box.appendChild(go);
+  }
+  output.appendChild(box);
+  output.scrollTop = output.scrollHeight;
+}
+
+// Put the cursor on a line of the editor, switching to it if we are elsewhere.
+function gotoLine(n) {
+  if (mode !== 'script') setMode('script');
+  switchTab('editor');
+  const count = getCode().split('\n').length;
+  const want = Math.max(1, Math.min(n, count));
+  if (usingCM) {
+    const line = cmView.state.doc.line(want);
+    cmView.dispatch({ selection: { anchor: line.from }, scrollIntoView: true });
+    cmView.focus();
+  } else {
+    let pos = 0;
+    for (let i = 1; i < want; i++) {
+      const next = fallback.value.indexOf('\n', pos);
+      if (next === -1) break;
+      pos = next + 1;
+    }
+    fallback.focus();
+    fallback.setSelectionRange(pos, pos);
   }
 }
 

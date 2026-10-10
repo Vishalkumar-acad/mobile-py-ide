@@ -185,6 +185,21 @@ main {
 .console-output .err { color: var(--danger); }
 .console-output .muted { color: var(--muted); }
 .console-output .echo { color: var(--accent); }
+/* One plain sentence about what went wrong, with a way to the offending line. */
+.console-output .err-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
 
 /* The console is a flex column, so the input can be moved above the output
    with `order` — handy on a phone, where the keyboard covers the bottom. */
@@ -360,6 +375,10 @@ main {
 .symbolbar button:active { background: var(--accent); color: #fff; }
 .symbolbar button.snip { font-size: 13px; }
 .symbolbar .divider { flex: 0 0 auto; width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+/* Two sets live in the bar — code tools and shell keys — and only one is
+   shown, depending on the mode. */
+.symbolbar .sym-set { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.symbolbar .sym-set[hidden] { display: none; }
 
 textarea, input { font-size: 16px; }
 .editor-fallback, .stdin-box, .console-input input { font-size: 15px; }
@@ -459,6 +478,18 @@ textarea, input { font-size: 16px; }
   gap: 8px;
   padding: 7px 0;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.file-rename {
+  flex: 1 1 100%;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-family: var(--mono);
+  font-size: 14px;
 }
 .file-name {
   flex: 1 1 auto;

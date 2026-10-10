@@ -153,6 +153,30 @@ export async function writeFile(base, name, source, maxBytes) {
   return { ok: true, rel: p.rel, size };
 }
 
+export async function renameFile(base, from, to) {
+  const a = safePath(base, from);
+  const b = safePath(base, to);
+  if (!a || !b) return { ok: false, error: 'That is not a valid file name.' };
+  if (a.full === b.full) return { ok: true, name: b.rel };
+  try {
+    const st = await fs.stat(a.full);
+    if (!st.isFile()) return { ok: false, error: 'That is not a file.' };
+  } catch {
+    return { ok: false, error: 'No such file.' };
+  }
+  try {
+    await fs.access(b.full);
+    return { ok: false, error: 'Something with that name already exists.' };
+  } catch { /* the name is free */ }
+  try {
+    await fs.rename(a.full, b.full);
+    forgetGlobalTotal();
+    return { ok: true, name: b.rel };
+  } catch {
+    return { ok: false, error: 'Could not rename it.' };
+  }
+}
+
 export async function deleteFile(base, name) {
   const p = safePath(base, name);
   if (!p) return false;

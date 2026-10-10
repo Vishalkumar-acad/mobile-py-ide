@@ -82,35 +82,64 @@
   </main>
 
   <div class="symbolbar" id="symbolbar" aria-label="Symbol toolbar">
-    <button type="button" data-key="tab" title="Indent">⇥ Tab</button>
-    <button type="button" data-insert=":">:</button>
-    <button type="button" data-insert="(">(</button>
-    <button type="button" data-insert=")">)</button>
-    <button type="button" data-insert="[">[</button>
-    <button type="button" data-insert="]">]</button>
-    <button type="button" data-insert="&quot;">"</button>
-    <button type="button" data-insert="'">'</button>
-    <button type="button" data-insert="=">=</button>
-    <button type="button" data-insert="_">_</button>
-    <button type="button" data-insert="#">#</button>
-    <button type="button" data-insert=",">,</button>
-    <button type="button" data-insert=".">.</button>
-    <button type="button" data-insert="&lt;">&lt;</button>
-    <button type="button" data-insert="&gt;">&gt;</button>
-    <button type="button" data-insert="+" class="snip">+</button>
-    <button type="button" data-insert="-" class="snip">-</button>
-    <button type="button" data-insert="*" class="snip">*</button>
-    <button type="button" data-insert="/" class="snip">/</button>
-    <span class="divider"></span>
-    <button type="button" data-insert="print()" data-back="1" class="snip">print()</button>
-    <button type="button" data-insert="input()" data-back="1" class="snip">input()</button>
-    <button type="button" data-insert="int(input())" class="snip">int(input())</button>
-    <button type="button" data-insert="range()" data-back="1" class="snip">range()</button>
-    <button type="button" data-insert="for i in range(10):&#10;    " class="snip">for</button>
-    <button type="button" data-insert="if True:&#10;    " class="snip">if</button>
-    <button type="button" data-insert="while True:&#10;    " class="snip">while</button>
-    <button type="button" data-insert="def name():&#10;    " class="snip">def</button>
-    <button type="button" data-insert="import " class="snip">import</button>
+    <div class="sym-set" data-set="code">
+      <button type="button" data-key="tab" title="Indent">⇥ Tab</button>
+      <button type="button" data-key="untab" title="Un-indent" data-only="script">⇤</button>
+      <button type="button" data-key="undo" title="Undo" data-only="script">↶</button>
+      <button type="button" data-key="redo" title="Redo" data-only="script">↷</button>
+      <span class="divider"></span>
+      <button type="button" data-insert=":">:</button>
+      <button type="button" data-insert="(">(</button>
+      <button type="button" data-insert=")">)</button>
+      <button type="button" data-insert="[">[</button>
+      <button type="button" data-insert="]">]</button>
+      <button type="button" data-insert="&quot;">"</button>
+      <button type="button" data-insert="'">'</button>
+      <button type="button" data-insert="=">=</button>
+      <button type="button" data-insert="_">_</button>
+      <button type="button" data-insert="#">#</button>
+      <button type="button" data-insert=",">,</button>
+      <button type="button" data-insert=".">.</button>
+      <button type="button" data-insert="&lt;">&lt;</button>
+      <button type="button" data-insert="&gt;">&gt;</button>
+      <button type="button" data-insert="+" class="snip">+</button>
+      <button type="button" data-insert="-" class="snip">-</button>
+      <button type="button" data-insert="*" class="snip">*</button>
+      <button type="button" data-insert="/" class="snip">/</button>
+      <span class="divider"></span>
+      <button type="button" data-insert="print()" data-back="1" class="snip">print()</button>
+      <button type="button" data-insert="input()" data-back="1" class="snip">input()</button>
+      <button type="button" data-insert="int(input())" class="snip">int(input())</button>
+      <button type="button" data-insert="range()" data-back="1" class="snip">range()</button>
+      <button type="button" data-insert="for i in range(10):&#10;    " class="snip">for</button>
+      <button type="button" data-insert="if True:&#10;    " class="snip">if</button>
+      <button type="button" data-insert="while True:&#10;    " class="snip">while</button>
+      <button type="button" data-insert="def name():&#10;    " class="snip">def</button>
+      <button type="button" data-insert="import " class="snip">import</button>
+    </div>
+
+    <!-- Terminal: the keys a phone keyboard does not have. -->
+    <div class="sym-set" data-set="shell" hidden>
+      <button type="button" data-hist="up" title="Previous command">↑</button>
+      <button type="button" data-hist="down" title="Next command">↓</button>
+      <button type="button" data-ctrl="c" title="Interrupt the running command">⌃C</button>
+      <span class="divider"></span>
+      <button type="button" data-insert="|">|</button>
+      <button type="button" data-insert="&amp;">&amp;</button>
+      <button type="button" data-insert="~">~</button>
+      <button type="button" data-insert="/">/</button>
+      <button type="button" data-insert="-">-</button>
+      <button type="button" data-insert="*">*</button>
+      <button type="button" data-insert="$">$</button>
+      <button type="button" data-insert="&gt;">&gt;</button>
+      <button type="button" data-insert="'">'</button>
+      <button type="button" data-insert="&quot;">"</button>
+      <span class="divider"></span>
+      <button type="button" data-insert="ls -la" class="snip">ls -la</button>
+      <button type="button" data-insert="pwd" class="snip">pwd</button>
+      <button type="button" data-insert="pip list" class="snip">pip list</button>
+      <button type="button" data-insert="python3 " class="snip">python3</button>
+    </div>
   </div>
 
   <dialog id="pkgDialog" class="dialog">

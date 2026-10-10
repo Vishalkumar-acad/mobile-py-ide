@@ -25,7 +25,7 @@ import { execute } from './executor.js';
 import { createRun, getRun, killRunsForSpace } from './runs.js';
 import { REPL_SOURCE } from './modes.js';
 import { allowlist, installPackage, uninstallPackage, listInstalled } from './packages.js';
-import { listFiles, readFile, writeFile, deleteFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
+import { listFiles, readFile, writeFile, deleteFile, renameFile, safePath, dirSize, globalTotal, globalLimitBytes } from './files.js';
 import { diagnostics } from './diag.js';
 import { identify, touch, startSweeper, perUserLimitBytes } from './spaces.js';
 import { acceptWebSocket } from './ws.js';
@@ -481,7 +481,11 @@ const server = http.createServer(async (req, res) => {
       const payload = await parseJsonBody(req, res, config.maxStdinBytes + 4096);
       if (!payload) return undefined;
       const data = typeof payload.data === 'string' ? payload.data : '';
-      const ok = run.write(data.endsWith('\n') ? data : `${data}\n`);
+      // `raw` sends the bytes exactly as given — no newline is added. That is
+      // how Ctrl+C reaches a terminal: a bare 0x03, not 0x03 then a newline.
+      const ok = payload.raw === true
+        ? run.writeRaw(Buffer.from(data, 'utf8'))
+        : run.write(data.endsWith('\n') ? data : `${data}\n`);
       return json(res, 200, { ok });
     }
 
@@ -521,6 +525,20 @@ const server = http.createServer(async (req, res) => {
       const result = await writeFile(space.dir, name, req, cap);
       touch(space.dir);
       return json(res, result.ok ? 200 : 413, result);
+    }
+    if (req.method === 'POST' && url.pathname === '/api/files/rename') {
+      if (isRateLimited(clientIp(req))) {
+        return json(res, 429, { ok: false, error: 'Too many requests, please slow down.' });
+      }
+      const space = await identify(req, res);
+      if (!space) return json(res, 400, { ok: false, error: 'No space for this visitor.' });
+      const payload = await parseJsonBody(req, res, 4096);
+      if (!payload) return undefined;
+      const from = typeof payload.from === 'string' ? payload.from : '';
+      const to = typeof payload.to === 'string' ? payload.to : '';
+      const result = await renameFile(space.dir, from, to);
+      touch(space.dir);
+      return json(res, result.ok ? 200 : 400, result);
     }
     const fileMatch = url.pathname.match(/^\/api\/files\/(.+)$/);
     if (fileMatch && (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE')) {
